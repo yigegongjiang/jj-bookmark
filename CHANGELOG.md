@@ -11,6 +11,10 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.4.2] - 2026-07-16
+
+跟随版本同步发布
+
 ## [0.4.1] - 2026-07-16
 
 ### Fixed

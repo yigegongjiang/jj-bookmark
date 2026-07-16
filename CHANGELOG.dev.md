@@ -7,6 +7,11 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.4.2] - 2026-07-16
+
+- 跟随版本同步发布
+  - 本机发布链路：`scripts/install-local.sh`(package release → `ditto` 装 /Applications → 自检) + `scripts/verify-app.sh`(无头断言内嵌 CLI 版本/启动/i18n/设置窗口/自动退出, WindowServer 不可达则降级跳过 GUI 层); workflow.md 发布改以本机安装+自检为交付闸, GHA 转 fire-and-forget
+
 ## [0.4.1] - 2026-07-16
 
 - 修复某些情况下主窗口右侧书签列表不显示（左侧文件夹栏占满整个窗口）

@@ -7,6 +7,11 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.1.2] - 2026-07-16
+
+- 跟随版本同步发布
+  - 精简用户文案：App 安装/更新对话框次按钮「以后再说」→「取消」；README 命令列表改中文功能动词（去 save/delete 等非真实命令名）；无行为变更
+
 ## [0.1.1] - 2026-07-16
 
 - 跟随版本同步发布
@@ -25,5 +30,6 @@
 - 查询：内嵌 jq 引擎的 `--filter`，数据文件也可直接用 `jq` 处理
   - `jaq`(纯 Rust,in-process)驱动 `--filter`；关键词模糊搜与四键排序走原生比较
 
+[0.1.2]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.1.2
 [0.1.1]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.1.1
 [0.1.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.1.0

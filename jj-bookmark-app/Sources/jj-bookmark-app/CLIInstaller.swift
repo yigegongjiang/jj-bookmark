@@ -68,7 +68,7 @@ enum CLIInstaller {
         alert.messageText = title
         alert.informativeText = text
         alert.addButton(withTitle: okTitle)
-        alert.addButton(withTitle: "以后再说")
+        alert.addButton(withTitle: "取消")
         return alert.runModal() == .alertFirstButtonReturn
     }
 }

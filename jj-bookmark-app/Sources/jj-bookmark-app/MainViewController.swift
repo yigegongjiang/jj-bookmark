@@ -21,11 +21,19 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
     // 视图
     private let outlineView = NSOutlineView()
     private let tableView = BookmarkTableView()
+    private let splitView = NSSplitView()
+    private let sidebarScroll = NSScrollView()
     private let searchField = NSSearchField()
     private let sortPopup = NSPopUpButton()
     private let orderButton = NSButton()
     private let newButton = NSButton()
     private let statusLabel = NSTextField(labelWithString: "")
+
+    // 分栏尺寸约束（左侧 folder 栏固定宽 + 两栏各自最小宽，防被拖成 0）
+    private let sidebarWidth: CGFloat = 240
+    private let sidebarMinWidth: CGFloat = 160
+    private let contentMinWidth: CGFloat = 360
+    private var didSetInitialSplitPosition = false
 
     init(runner: CLIRunner) {
         self.runner = runner
@@ -81,6 +89,27 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
         }
         watcher.start()
         self.watcher = watcher
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        // 窗口已定尺寸后落定分隔条：把 folder 栏放到固定宽，右侧列表占其余空间（只做一次，之后尊重用户拖动）。
+        if !didSetInitialSplitPosition {
+            didSetInitialSplitPosition = true
+            splitView.setPosition(sidebarWidth, ofDividerAt: 0)
+        }
+        dumpLayoutIfNeeded()
+    }
+
+    /// 无头验证钩子：env JJ_BOOKMARK_DUMP_LAYOUT=1 时输出两栏实际宽度（断言右侧列表栏 > 0）。
+    private func dumpLayoutIfNeeded() {
+        guard ProcessInfo.processInfo.environment["JJ_BOOKMARK_DUMP_LAYOUT"] == "1" else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let sidebar = self.sidebarScroll.frame.width
+            let content = self.tableView.enclosingScrollView?.frame.width ?? 0
+            NSLog("JJ_LAYOUT sidebar=%.1f content=%.1f split=%.1f", sidebar, content, self.splitView.bounds.width)
+        }
     }
 
     // MARK: - UI 构建
@@ -140,10 +169,9 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
         outlineView.rowSizeStyle = .default
         outlineView.autosaveExpandedItems = false
         outlineView.indentationPerLevel = 14
-        let leftScroll = NSScrollView()
-        leftScroll.documentView = outlineView
-        leftScroll.hasVerticalScroller = true
-        leftScroll.autohidesScrollers = true
+        sidebarScroll.documentView = outlineView
+        sidebarScroll.hasVerticalScroller = true
+        sidebarScroll.autohidesScrollers = true
 
         // 右：书签列表 + 底部状态条
         let bmColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("bookmark"))
@@ -175,13 +203,15 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
             statusLabel.bottomAnchor.constraint(equalTo: rightContainer.bottomAnchor, constant: -4),
         ])
 
-        let split = NSSplitView()
-        split.isVertical = true
-        split.dividerStyle = .thin
-        split.addArrangedSubview(leftScroll)
-        split.addArrangedSubview(rightContainer)
-        leftScroll.setFrameSize(NSSize(width: 240, height: 600))
-        return split
+        splitView.isVertical = true
+        splitView.dividerStyle = .thin
+        splitView.delegate = self
+        splitView.addArrangedSubview(sidebarScroll)
+        splitView.addArrangedSubview(rightContainer)
+        // 两栏都给非零初始宽：NSSplitView 首次按比例分配，若右栏宽 0 会被永久压成 0（右侧列表消失）。
+        sidebarScroll.setFrameSize(NSSize(width: sidebarWidth, height: 600))
+        rightContainer.setFrameSize(NSSize(width: 760, height: 600))
+        return splitView
     }
 
     // MARK: - 加载 / 刷新
@@ -625,5 +655,24 @@ extension MainViewController: NSSearchFieldDelegate {
         guard (obj.object as? NSSearchField) === searchField else { return }
         searchText = searchField.stringValue
         recomputeVisible()
+    }
+}
+
+// MARK: - 分栏约束（NSSplitView）
+
+extension MainViewController: NSSplitViewDelegate {
+    // 窗口缩放时固定左侧 folder 栏，只伸缩右侧列表栏。
+    func splitView(_: NSSplitView, shouldAdjustSizeOfSubview subview: NSView) -> Bool {
+        subview !== sidebarScroll
+    }
+
+    // 左侧 folder 栏最小宽。
+    func splitView(_: NSSplitView, constrainMinCoordinate proposedMin: CGFloat, ofSubviewAt _: Int) -> CGFloat {
+        max(proposedMin, sidebarMinWidth)
+    }
+
+    // 右侧列表栏最小宽（分隔条不能贴到右边缘把列表压没）。
+    func splitView(_ splitView: NSSplitView, constrainMaxCoordinate proposedMax: CGFloat, ofSubviewAt _: Int) -> CGFloat {
+        min(proposedMax, splitView.bounds.width - contentMinWidth)
     }
 }

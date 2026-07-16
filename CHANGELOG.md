@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.4.1] - 2026-07-16
+
+### Fixed
+
+- 修复某些情况下主窗口右侧书签列表不显示（左侧文件夹栏占满整个窗口）
+
 ## [0.4.0] - 2026-07-16
 
 ### Added

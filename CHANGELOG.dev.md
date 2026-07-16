@@ -7,6 +7,11 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.4.1] - 2026-07-16
+
+- 修复某些情况下主窗口右侧书签列表不显示（左侧文件夹栏占满整个窗口）
+  - NSSplitView 右栏初始 frame 宽 0，首次按比例分配被永久压成 0；加 NSSplitViewDelegate(左栏 shouldAdjustSizeOfSubview 固定 + constrainMin/Max 两栏最小宽) + viewDidAppear setPosition 落定初始分隔位置 + 右栏补非零初始宽; env JJ_BOOKMARK_DUMP_LAYOUT 无头自检
+
 ## [0.4.0] - 2026-07-16
 
 - 记住主窗口尺寸；每次在鼠标所在的屏幕居中打开（多显示器友好）

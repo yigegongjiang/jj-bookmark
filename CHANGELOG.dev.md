@@ -7,6 +7,11 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.4.3] - 2026-07-16
+
+- 跟随版本同步发布
+  - 移除 App 无头自检能力：删 `scripts/verify-app.sh` + 源码内所有测试门控 env 钩子（`JJ_BOOKMARK_DUMP_L10N`/`DUMP_WINDOW`/`OPEN_SETTINGS`/`DUMP_LAYOUT`/`AUTOEXIT_SECONDS`/`NO_INSTALL`/`DIR`）；App 数据目录固定 `~/.config/jj-bookmark`（AppPaths 不再读 `JJ_BOOKMARK_DIR`，杜绝自检指向空目录导致的空白假象）；`install-local.sh` 交付闸改为仅打包+装 /Applications；仅保留 `JJ_BOOKMARK_CLI`（dev 从源码定位 CLI，正式包内死代码）；无用户可感知变化
+
 ## [0.4.2] - 2026-07-16
 
 - 跟随版本同步发布

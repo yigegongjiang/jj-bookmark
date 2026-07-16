@@ -9,9 +9,8 @@ enum CLIInstaller {
         .appendingPathComponent(".local/bin/jj-bookmark")
 
     static func installIfNeeded(runner: CLIRunner) {
-        let env = ProcessInfo.processInfo.environment
-        // dev（JJ_BOOKMARK_CLI）或测试（JJ_BOOKMARK_NO_INSTALL）时跳过。
-        guard env["JJ_BOOKMARK_CLI"] == nil, env["JJ_BOOKMARK_NO_INSTALL"] == nil else { return }
+        // dev（JJ_BOOKMARK_CLI 指向源码构建的 CLI）时跳过安装。
+        guard ProcessInfo.processInfo.environment["JJ_BOOKMARK_CLI"] == nil else { return }
         let bundleVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
         guard !bundleVersion.isEmpty else { return } // 非 .app 运行
 

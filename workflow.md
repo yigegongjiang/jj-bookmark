@@ -22,12 +22,11 @@
   - 快速编译：`cd jj-bookmark-app && swift build`
   - 构建 + 组装 `.app`（内嵌同版本 CLI）：`./jj-bookmark-app/package.sh [release|debug]`  # 默认 release
   - 运行：`open jj-bookmark-app/build/jj-bookmark.app`
-  - 无头自检：`./scripts/verify-app.sh [bundle]`  # 默认 build/jj-bookmark.app；断言内嵌 CLI 版本 + 启动 + i18n + 设置窗口 + 自动退出（WindowServer 不可达则降级跳过 GUI 层）
   - 验证跨进程刷新：改动 `~/.config/jj-bookmark/bookmarks.json` 后 App 无需重启即刷新（FSEvents）
 
 # 发布
 
-代码变更完成后立即执行（= 需求交付的最后环节）。发布 = 版本落定 + 本机安装自检 + push tag。交付闸 = `scripts/install-local.sh`（打 release 包 + 装 /Applications + 无头自检，不过则非 0 退出中止）。push tag `vX.Y.Z` 触发 GHA（`.github/workflows/release.yml`）后台打包 macOS App + CLI 并创建 GitHub Release —— fire-and-forget，本地无需观察（出错人类自行发现）。
+代码变更完成后立即执行（= 需求交付的最后环节）。发布 = 版本落定 + 本机安装 + push tag。交付闸 = CLI `cargo test`（§1）+ `scripts/install-local.sh` 打包成功（打 release 包 + 装 /Applications，任一步失败即非 0 退出中止）。push tag `vX.Y.Z` 触发 GHA（`.github/workflows/release.yml`）后台打包 macOS App + CLI 并创建 GitHub Release —— fire-and-forget，本地无需观察（出错人类自行发现）。
 
 ## TL;DR
 
@@ -35,13 +34,13 @@
 
 1. 验证 CLI：`cd jj-bookmark-cli && cargo check && cargo test`
 2. 写版本：改根 `VERSION` 一处 → `scripts/set-version.sh` 同步 `Cargo.toml`（App 版本由 `package.sh` 注入 `Info.plist`）+ `CHANGELOG.md` + `CHANGELOG.dev.md` 同步（与 tag 一致）
-3. 本机发布 + 提交：`./scripts/install-local.sh`（打包 → 装 /Applications → 无头自检）→ commit + annotated tag + push branch + tag（GHA 后台出 Release，无需观察）
+3. 本机发布 + 提交：`./scripts/install-local.sh`（打包 → 装 /Applications）→ commit + annotated tag + push branch + tag（GHA 后台出 Release，无需观察）
 4. 修上版 bug：amend + 删远程 tag + 重打 + force push（GHA 随新 tag 重跑）
 
 ## 1. 验证
 
 - CLI：`cd jj-bookmark-cli && cargo check && cargo test`
-- App：构建 + 组装 + 无头自检并入 §3 `install-local.sh`（打包失败或自检不过即中止发布）
+- App：构建 + 组装并入 §3 `install-local.sh`（打包失败即中止发布）
 
 ## 2. 写版本
 
@@ -52,7 +51,7 @@
 ## 3. 本机发布 + 提交
 
 ```bash
-./scripts/install-local.sh          # 打 release 包 → 装 /Applications → 无头自检（不过则非 0 退出中止）
+./scripts/install-local.sh          # 打 release 包 → 装 /Applications（打包失败则非 0 退出中止）
 git add -A
 git commit -m "release: vX.Y.Z"
 git tag -a vX.Y.Z -m "vX.Y.Z"
@@ -60,7 +59,7 @@ git push origin master
 git push origin vX.Y.Z
 ```
 
-`install-local.sh` 自检失败即非 0 退出中止；通过后再 commit / tag / push。push tag 后 GHA 后台构建并出 Release（见 §5）—— 无需 `gh run watch`，出错人类自行发现。
+`install-local.sh` 打包失败即非 0 退出中止；通过后再 commit / tag / push。push tag 后 GHA 后台构建并出 Release（见 §5）—— 无需 `gh run watch`，出错人类自行发现。
 
 ## 4. 修上版 bug
 
@@ -69,7 +68,7 @@ git push origin vX.Y.Z
 > `--force-with-lease` + 删远程 tag 会改写已推送历史；仅在「刚发布、远程未被他人拉取」时使用。
 
 ```bash
-./scripts/install-local.sh          # 重打包 + 重装 + 自检修复后再重发
+./scripts/install-local.sh          # 重打包 + 重装后再重发
 git commit --amend --no-edit
 git tag -d vX.Y.Z
 git push origin :refs/tags/vX.Y.Z

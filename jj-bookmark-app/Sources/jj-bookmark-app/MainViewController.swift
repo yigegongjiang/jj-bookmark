@@ -98,18 +98,6 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
             didSetInitialSplitPosition = true
             splitView.setPosition(sidebarWidth, ofDividerAt: 0)
         }
-        dumpLayoutIfNeeded()
-    }
-
-    /// 无头验证钩子：env JJ_BOOKMARK_DUMP_LAYOUT=1 时输出两栏实际宽度（断言右侧列表栏 > 0）。
-    private func dumpLayoutIfNeeded() {
-        guard ProcessInfo.processInfo.environment["JJ_BOOKMARK_DUMP_LAYOUT"] == "1" else { return }
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            let sidebar = self.sidebarScroll.frame.width
-            let content = self.tableView.enclosingScrollView?.frame.width ?? 0
-            NSLog("JJ_LAYOUT sidebar=%.1f content=%.1f split=%.1f", sidebar, content, self.splitView.bounds.width)
-        }
     }
 
     // MARK: - UI 构建

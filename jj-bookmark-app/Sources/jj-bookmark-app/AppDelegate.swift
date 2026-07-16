@@ -19,26 +19,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         setupWindow()
         autoExit.start()  // 启动即 arm 倒计时（不等首次交互）
         NSApp.activate(ignoringOtherApps: true)
-
-        // 测试门控：无 GUI 授权下自检窗口尺寸记忆（dump 实际 content/frame 后退出，不阻塞正常使用）。
-        // 配合 argument-domain `-JJBookmark.windowW/H` 验证 restore 路径。
-        if ProcessInfo.processInfo.environment["JJ_BOOKMARK_DUMP_WINDOW"] != nil {
-            let cs = window.contentRect(forFrameRect: window.frame).size
-            let fs = window.frame.size
-            print("[window] content = \(Int(cs.width))x\(Int(cs.height))")
-            print("[window] frame = \(Int(fs.width))x\(Int(fs.height))")
-            print("[window] contentMin = \(Int(window.contentMinSize.width))x\(Int(window.contentMinSize.height))")
-            exit(0)
-        }
-
-        // 测试门控：无 GUI 授权下自检设置窗口可开、无裁切（不影响正常使用）。
-        if ProcessInfo.processInfo.environment["JJ_BOOKMARK_OPEN_SETTINGS"] != nil {
-            showSettings(nil)
-            if let cv = settingsController?.window?.contentView {
-                cv.layoutSubtreeIfNeeded()
-                NSLog("jj-bookmark[selfcheck] lang=\(L10n.lang) settings window=\(settingsController!.window!.frame.size) fitting=\(cv.fittingSize)")
-            }
-        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

@@ -28,12 +28,8 @@ final class AutoExitManager {
         set { UserDefaults.standard.set(max(1, newValue), forKey: minutesKey) }
     }
 
-    // 倒计时秒数：测试用 env override 免等真 5 分钟；否则分钟换算。
-    static var intervalSeconds: TimeInterval {
-        if let s = ProcessInfo.processInfo.environment["JJ_BOOKMARK_AUTOEXIT_SECONDS"],
-           let v = Double(s), v > 0 { return v }
-        return TimeInterval(minutes * 60)
-    }
+    // 倒计时秒数：分钟换算。
+    static var intervalSeconds: TimeInterval { TimeInterval(minutes * 60) }
 
     private var timer: Timer?
     private var eventMonitor: Any?

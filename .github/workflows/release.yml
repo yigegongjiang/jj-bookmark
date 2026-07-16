@@ -1,0 +1,78 @@
+name: release
+
+# push tag vX.Y.Z 触发：打包 macOS App + CLI，创建 GitHub Release。
+# runner 必须为 macos-26：项目用 .defaultIsolation(Swift 6.2)，仅 Xcode 26+ 可编译；
+# macos-15 仅带 Xcode 16.x。arm64 原生构建，产物即 arm64（未做 universal，见 workflow.md）。
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # gh release create 需要
+
+jobs:
+  build-release:
+    runs-on: macos-26
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 校验 tag 与 VERSION 一致
+        run: |
+          want="v$(tr -d ' \t\n\r' < VERSION)"
+          [ "$GITHUB_REF_NAME" = "$want" ] || { echo "tag $GITHUB_REF_NAME != VERSION $want，先对齐再发" >&2; exit 1; }
+
+      - name: 选最新 Xcode + 校验 Swift ≥ 6.2
+        run: |
+          sudo xcode-select -s "$(printf '%s\n' /Applications/Xcode_*.app | sort -V | tail -1)/Contents/Developer"
+          swift --version
+          sw="$(swift -version 2>&1 | sed -n 's/.*Swift version \([0-9]*\.[0-9]*\).*/\1/p' | head -1)"
+          if [ "$(printf '%s\n6.2\n' "$sw" | sort -V | head -1)" != "6.2" ]; then
+            echo "需要 Swift ≥ 6.2，实际 $sw（runner 镜像回退？换更新的 macos-* label）" >&2; exit 1
+          fi
+
+      - name: 准备 Rust stable（edition 2024 需 ≥ 1.85）
+        run: |
+          rustup update stable
+          rustup default stable
+          rustc --version
+
+      - name: 打包 .app（内嵌同版本 CLI）
+        run: ./jj-bookmark-app/package.sh release
+
+      - name: ad-hoc 签名（无 Developer 证书；封装 bundle）
+        run: |
+          app="jj-bookmark-app/build/jj-bookmark.app"
+          codesign --force --sign - "$app/Contents/Helpers/jj-bookmark"
+          codesign --force --deep --sign - "$app"
+          codesign --verify "$app"
+
+      - name: 组装发布产物（arm64）
+        run: |
+          mkdir -p dist
+          app="jj-bookmark-app/build/jj-bookmark.app"
+          ditto -c -k --keepParent "$app" "dist/jj-bookmark-macos-arm64.zip" # 保 bundle 结构/签名
+          cp jj-bookmark-cli/target/release/jj-bookmark "dist/jj-bookmark-cli-macos-arm64"
+          ( cd dist && shasum -a 256 jj-bookmark-macos-arm64.zip jj-bookmark-cli-macos-arm64 > SHA256SUMS.txt )
+
+      - name: 生成 Release notes（CHANGELOG 本版段 + 安装说明 footer）
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          awk -v v="$ver" '
+            $0 ~ "^## \\[" v "\\]" { p=1; next }
+            p && (/^## \[/ || /^\[[^]]*\]: /) { exit }
+            p { print }
+          ' CHANGELOG.md > notes.md
+          printf '\n' >> notes.md
+          cat .github/release-notes-footer.md >> notes.md
+
+      - name: 创建 GitHub Release
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file notes.md \
+            dist/jj-bookmark-macos-arm64.zip \
+            dist/jj-bookmark-cli-macos-arm64 \
+            dist/SHA256SUMS.txt

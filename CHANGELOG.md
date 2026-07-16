@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.8.0] - 2026-07-16
+
+### Changed
+
+- 左侧文件夹栏默认宽度缩小；手动调整后下次启动沿用
+
 ## [0.7.0] - 2026-07-16
 
 ### Added

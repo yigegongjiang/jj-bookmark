@@ -30,7 +30,8 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
     private let statusLabel = NSTextField(labelWithString: "")
 
     // 分栏尺寸约束（左侧 folder 栏固定宽 + 两栏各自最小宽，防被拖成 0）
-    private let sidebarWidth: CGFloat = 240
+    private static let sidebarWidthKey = "JJBookmark.sidebarWidth"
+    private let defaultSidebarWidth: CGFloat = 200
     private let sidebarMinWidth: CGFloat = 160
     private let contentMinWidth: CGFloat = 360
     private var didSetInitialSplitPosition = false
@@ -93,10 +94,14 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
 
     override func viewDidAppear() {
         super.viewDidAppear()
-        // 窗口已定尺寸后落定分隔条：把 folder 栏放到固定宽，右侧列表占其余空间（只做一次，之后尊重用户拖动）。
+        // 窗口已定尺寸后恢复分隔条：无有效记录时用默认宽，之后尊重用户拖动。
         if !didSetInitialSplitPosition {
             didSetInitialSplitPosition = true
-            splitView.setPosition(sidebarWidth, ofDividerAt: 0)
+            let savedWidth = CGFloat(UserDefaults.standard.double(forKey: Self.sidebarWidthKey))
+            let preferredWidth = savedWidth.isFinite && savedWidth >= sidebarMinWidth
+                ? savedWidth : defaultSidebarWidth
+            let maxWidth = max(sidebarMinWidth, splitView.bounds.width - contentMinWidth)
+            splitView.setPosition(min(preferredWidth, maxWidth), ofDividerAt: 0)
         }
     }
 
@@ -197,8 +202,8 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
         splitView.addArrangedSubview(sidebarScroll)
         splitView.addArrangedSubview(rightContainer)
         // 两栏都给非零初始宽：NSSplitView 首次按比例分配，若右栏宽 0 会被永久压成 0（右侧列表消失）。
-        sidebarScroll.setFrameSize(NSSize(width: sidebarWidth, height: 600))
-        rightContainer.setFrameSize(NSSize(width: 760, height: 600))
+        sidebarScroll.setFrameSize(NSSize(width: defaultSidebarWidth, height: 600))
+        rightContainer.setFrameSize(NSSize(width: 800, height: 600))
         return splitView
     }
 
@@ -646,6 +651,14 @@ extension MainViewController: NSSearchFieldDelegate {
 // MARK: - 分栏约束（NSSplitView）
 
 extension MainViewController: NSSplitViewDelegate {
+    // 分隔条变化后立即记住左栏宽；初始化完成前的布局过程不落盘。
+    func splitViewDidResizeSubviews(_ notification: Notification) {
+        guard didSetInitialSplitPosition,
+              (notification.object as? NSSplitView) === splitView
+        else { return }
+        UserDefaults.standard.set(sidebarScroll.frame.width, forKey: Self.sidebarWidthKey)
+    }
+
     // 窗口缩放时固定左侧 folder 栏，只伸缩右侧列表栏。
     func splitView(_: NSSplitView, shouldAdjustSizeOfSubview subview: NSView) -> Bool {
         subview !== sidebarScroll

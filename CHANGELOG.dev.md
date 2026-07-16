@@ -7,6 +7,11 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.8.0] - 2026-07-16
+
+- 左侧文件夹栏默认宽度缩小；手动调整后下次启动沿用
+  - 默认宽度 240→200；NSSplitViewDelegate resize 回调写 UserDefaults，启动恢复并按两栏最小宽约束裁剪
+
 ## [0.7.0] - 2026-07-16
 
 - `--help` 顶部直接给出添加流程，可先列出已有文件夹路径再保存书签

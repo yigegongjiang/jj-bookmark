@@ -8,9 +8,15 @@ import PackageDescription
 let package = Package(
     name: "jj-bookmark-app",
     platforms: [.macOS(.v13)],
+    dependencies: [
+        .package(url: "https://github.com/ameshkov/swift-psl", from: "1.1.145")
+    ],
     targets: [
         .executableTarget(
             name: "jj-bookmark-app",
+            dependencies: [
+                .product(name: "PublicSuffixList", package: "swift-psl")
+            ],
             path: "Sources/jj-bookmark-app",
             swiftSettings: [
                 .defaultIsolation(MainActor.self)

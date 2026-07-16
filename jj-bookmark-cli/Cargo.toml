@@ -1,0 +1,30 @@
+[package]
+name = "jj-bookmark-cli"
+version = "0.1.0"
+edition = "2024"
+
+# 二进制名固定为 jj-bookmark（crate 目录名带 -cli 后缀以区分工程）。
+[[bin]]
+name = "jj-bookmark"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+csv = "1"
+libc = "0.2"
+anyhow = "1"
+# 内嵌 jq 引擎（纯 Rust，in-process；驱动 query --filter）。三包版本号不统一（jaq-json 2.x
+# 依赖 jaq-core 3.x / jaq-std 3.x），Cargo.lock 锁定精确版本。
+jaq-core = "3.1"
+jaq-std = "3.0"
+jaq-json = "2.0"
+# 元数据抓取（Phase 4）。默认 TLS 在 macOS = Secure Transport（系统级，非 OpenSSL）；
+# charset 特性处理非 UTF-8 页面。blocking 自带运行时。
+reqwest = { version = "0.13", features = ["blocking", "gzip"] }
+scraper = "0.27"
+
+[profile.release]
+lto = true
+strip = true

@@ -30,6 +30,10 @@ mkdir -p "$BUNDLE/Contents/MacOS" "$BUNDLE/Contents/Resources" "$BUNDLE/Contents
 cp "$APP_BIN" "$BUNDLE/Contents/MacOS/jj-bookmark-app"
 cp "$CLI_BIN" "$BUNDLE/Contents/Helpers/jj-bookmark"        # 内嵌同版本 CLI
 cp "$APP_DIR/Resources/AppIcon.icns" "$BUNDLE/Contents/Resources/AppIcon.icns"
+for RESOURCE_BUNDLE in "$APP_DIR/.build/$CONFIG/"*.bundle; do
+    [ -d "$RESOURCE_BUNDLE" ] || continue
+    cp -R "$RESOURCE_BUNDLE" "$BUNDLE/"
+done
 sed "s/@VERSION@/$VERSION/g" "$APP_DIR/Resources/Info.plist.in" > "$BUNDLE/Contents/Info.plist"
 printf 'APPL????' > "$BUNDLE/Contents/PkgInfo"
 

@@ -1,0 +1,24 @@
+{
+  "originHash" : "c6cd345c0616ed1ebccecabb3d3a6ec352f4a69499b7adc1ad70c312855c4d12",
+  "pins" : [
+    {
+      "identity" : "punycodeswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/gumob/PunycodeSwift.git",
+      "state" : {
+        "revision" : "30a462bdb4398ea835a3585472229e0d74b36ba5",
+        "version" : "3.0.0"
+      }
+    },
+    {
+      "identity" : "swift-psl",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ameshkov/swift-psl",
+      "state" : {
+        "revision" : "f7a9034545a5cf8d8b6567653968bca9ac1e81f2",
+        "version" : "1.1.154"
+      }
+    }
+  ],
+  "version" : 3
+}

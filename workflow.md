@@ -35,9 +35,8 @@
 
 1. 验证 CLI：`cd jj-bookmark-cli && cargo check && cargo test`
 2. 写版本：改根 `VERSION` 一处 → `scripts/set-version.sh` 同步 `Cargo.toml`（App 版本由 `package.sh` 注入 `Info.plist`）+ `CHANGELOG.md` + `CHANGELOG.dev.md` 同步（与 tag 一致）
-3. 本机发布：`./scripts/install-local.sh`（打 release 包 → 装 /Applications → 无头自检）
-4. 提交：commit + annotated tag + push branch + tag（GHA 后台自动出 Release，无需观察）
-5. 修上版 bug：amend + 删远程 tag + 重打 + force push（GHA 随新 tag 重跑）
+3. 本机发布 + 提交：`./scripts/install-local.sh`（打包 → 装 /Applications → 无头自检）→ commit + annotated tag + push branch + tag（GHA 后台出 Release，无需观察）
+4. 修上版 bug：amend + 删远程 tag + 重打 + force push（GHA 随新 tag 重跑）
 
 ## 1. 验证
 

@@ -11,14 +11,19 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.1.1] - 2026-07-16
+
+跟随版本同步发布
+
 ## [0.1.0] - 2026-07-16
 
 ### Added
 
-- 极简本地书签工具：命令行 `jj-bookmark` 与 macOS App，共享一份可读 JSON 数据文件
+- 书签工具：命令行 `jj-bookmark` 与 macOS App，共享一份 JSON 数据文件
 - 保存 / 编辑 / 删除 / 打开 / 查询书签；按添加·编辑·访问时间与名称多维排序
-- 保存 URL 自动抓取标题 / 描述 / 封面；从 raindrop CSV 一次性导入
+- 保存 URL 自动抓取标题 / 描述 / 封面；从 raindrop CSV 批量导入
 - App 三栏浏览 + 文件夹树 + 即时搜索；终端改动后无需重启即刷新
-- 强大查询：内嵌 jq 引擎的 `--filter`，数据文件也可直接用 `jq` 处理
+- 查询：内嵌 jq 引擎的 `--filter`，数据文件也可直接用 `jq` 处理
 
+[0.1.1]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.1.1
 [0.1.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.1.0

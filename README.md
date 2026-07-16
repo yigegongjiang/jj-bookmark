@@ -8,12 +8,12 @@
 
 # jj-bookmark
 
-极简本地书签工具：Rust CLI (`jj-bookmark`) 为唯一核心，macOS App (Swift + AppKit) 为其 GUI 前端，共享一份人类可读的 JSON 数据文件，快 / 可读 / 可 `jq`。
+书签工具：Rust CLI (`jj-bookmark`) 为唯一核心，macOS App (Swift + AppKit) 为其 GUI 前端，共享一份 JSON 数据文件。
 
 ## 使用
 
 - CLI：`jj-bookmark-cli/` 构建出二进制 `jj-bookmark`，提供 save / edit / query / delete / open + CSV 导入 + 元数据抓取；命令详见 `jj-bookmark --help`。
-- App：`jj-bookmark-app/` 由 `package.sh` 组装出 macOS `.app`，桌面端浏览 / 编辑；bundle 内嵌同版本 CLI 作运行核心，开箱即用、无需另装 CLI（`~/.local/bin` 安装仅为方便终端调用，可选）。
+- App：`jj-bookmark-app/` 由 `package.sh` 组装出 macOS `.app`，桌面端浏览 / 编辑；bundle 内嵌同版本 CLI 作运行核心，无需另装 CLI（`~/.local/bin` 安装仅为方便终端调用，可选）。
 - 数据文件：`~/.config/jj-bookmark/bookmarks.json`（pretty JSON，可手改 / `jq` 处理）。
 
 ## 架构

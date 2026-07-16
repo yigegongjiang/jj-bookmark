@@ -21,7 +21,7 @@ use query::{Order, SortKey};
 use store::{Paths, mutate, read_store};
 
 #[derive(Parser)]
-#[command(name = "jj-bookmark", version, about = "极简本地书签工具（核心 CLI）")]
+#[command(name = "jj-bookmark", version, about = "书签工具")]
 struct Cli {
     #[command(subcommand)]
     cmd: Command,

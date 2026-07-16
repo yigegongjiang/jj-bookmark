@@ -21,7 +21,12 @@ use query::{Order, SortKey};
 use store::{Paths, mutate, read_store};
 
 #[derive(Parser)]
-#[command(name = "jj-bookmark", version, about = "Bookmark tool")]
+#[command(
+    name = "jj-bookmark",
+    version,
+    about = "Bookmark tool",
+    before_help = "TL;DR — add a bookmark:\n  Existing folder paths: jj-bookmark folders\n  jj-bookmark add <URL> [--folder <PATH>] [--title <TITLE>] [--note <NOTE>] [--fetch]\n  Only URL is required; omit --folder for uncategorized; --fetch retrieves metadata now."
+)]
 struct Cli {
     #[command(subcommand)]
     cmd: Command,
@@ -55,6 +60,8 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// List existing folder paths, one per line
+    Folders,
     /// Search bookmarks by whitespace-separated keywords (sortable); `--filter` takes a native jq filter (run by embedded jaq)
     Query {
         /// Keyword (may be an empty string to match all, used with --filter)
@@ -117,6 +124,7 @@ fn main() -> Result<()> {
         Command::Ls { folder, sort, order, json } => {
             cmd_list(&paths, None, None, folder, sort, order, json)
         }
+        Command::Folders => cmd_folders(&paths),
         Command::Query { keyword, filter, folder, sort, order, json } => {
             cmd_list(&paths, Some(keyword), filter, folder, sort, order, json)
         }
@@ -155,6 +163,21 @@ fn cmd_add(
         if let Err(e) = fetch_and_apply(paths, id, false) {
             eprintln!("Warning: metadata fetch failed (bookmark saved): {e:#}");
         }
+    }
+    Ok(())
+}
+
+fn cmd_folders(paths: &Paths) -> Result<()> {
+    let mut folders: Vec<_> = read_store(paths)?
+        .bookmarks
+        .into_iter()
+        .map(|b| b.folder)
+        .filter(|folder| !folder.is_empty())
+        .collect();
+    folders.sort();
+    folders.dedup();
+    for folder in folders {
+        println!("{folder}");
     }
     Ok(())
 }

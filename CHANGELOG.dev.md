@@ -7,6 +7,11 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.7.0] - 2026-07-16
+
+- `--help` 顶部直接给出添加流程，可先列出已有文件夹路径再保存书签
+  - 新增 `folders` 去重排序输出非空路径；`before_help` 串联 `folders` → `add`
+
 ## [0.6.0] - 2026-07-16
 
 - 书签列表显示完整网址，仅用红色突出可注册主域名，便于快速定位站点

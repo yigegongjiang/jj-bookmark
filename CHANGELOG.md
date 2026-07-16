@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.7.0] - 2026-07-16
+
+### Added
+
+- `--help` 顶部直接给出添加流程，可先列出已有文件夹路径再保存书签
+
 ## [0.6.0] - 2026-07-16
 
 ### Changed

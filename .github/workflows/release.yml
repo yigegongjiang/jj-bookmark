@@ -70,6 +70,9 @@ jobs:
 
       - name: 创建 GitHub Release
         run: |
+          # 幂等：重打同 tag（见 workflow.md §4）时先删旧 release，避免 create 冲突。
+          # 不带 --cleanup-tag，保留当前 git tag；首次发布该删除为 no-op。
+          gh release delete "$GITHUB_REF_NAME" --yes 2>/dev/null || true
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --notes-file notes.md \

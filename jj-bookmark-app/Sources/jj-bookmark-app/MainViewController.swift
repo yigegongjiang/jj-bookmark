@@ -88,7 +88,7 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
     private func makeToolbar() -> NSView {
         let bar = NSView()
 
-        searchField.placeholderString = "搜索标题 / 网址 / 描述"
+        searchField.placeholderString = L10n.searchPlaceholder
         searchField.translatesAutoresizingMaskIntoConstraints = false
 
         for key in SortKey.allCases {
@@ -106,7 +106,7 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
         updateOrderButtonTitle()
 
         newButton.bezelStyle = .rounded
-        newButton.title = "＋ 新建"
+        newButton.title = L10n.toolbarNew
         newButton.target = self
         newButton.action = #selector(newBookmark)
         newButton.translatesAutoresizingMaskIntoConstraints = false
@@ -133,7 +133,7 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
     private func makeSplitView() -> NSView {
         // 左：folder 树
         let folderColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("folder"))
-        folderColumn.title = "文件夹"
+        folderColumn.title = L10n.columnFolder
         outlineView.addTableColumn(folderColumn)
         outlineView.outlineTableColumn = folderColumn
         outlineView.headerView = nil
@@ -147,7 +147,7 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
 
         // 右：书签列表 + 底部状态条
         let bmColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("bookmark"))
-        bmColumn.title = "书签"
+        bmColumn.title = L10n.columnBookmark
         tableView.addTableColumn(bmColumn)
         tableView.headerView = nil
         tableView.rowHeight = 46
@@ -192,7 +192,7 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
         do {
             allBookmarks = try runner.loadAll()
         } catch {
-            showError(error, title: "加载失败")
+            showError(error, title: L10n.errorLoadFailed)
             return
         }
         folderRoots = FolderTree.build(from: allBookmarks)
@@ -233,7 +233,9 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
     private func updateStatus() {
         let total = allBookmarks.count
         let shown = visible.count
-        statusLabel.stringValue = shown == total ? "\(total) 条" : "\(shown) / \(total) 条"
+        statusLabel.stringValue = shown == total
+            ? L10n.statusTotal(total)
+            : L10n.statusFiltered(shown: shown, total: total)
     }
 
     // MARK: - 状态捕获 / 恢复（按稳定 id / path，非行号）
@@ -333,7 +335,7 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
     }
 
     private func updateOrderButtonTitle() {
-        orderButton.title = sortOrder == .asc ? "↑ 升序" : "↓ 降序"
+        orderButton.title = sortOrder == .asc ? L10n.orderAscending : L10n.orderDescending
     }
 
     private func syncSortControls() {
@@ -367,10 +369,10 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
 
     @objc func newBookmark() {
         let folderDefault = selectedFolder?.kind == .normal ? (selectedFolder?.path ?? "") : ""
-        guard let v = runForm(title: "新建书签", okTitle: "添加", fields: [
+        guard let v = runForm(title: L10n.formNewTitle, okTitle: L10n.btnAdd, fields: [
             ("URL", "", "https://…"),
-            ("标题", "", "留空则用 URL"),
-            ("文件夹", folderDefault, "A / B"),
+            (L10n.fieldTitle, "", L10n.placeholderTitleHint),
+            (L10n.fieldFolder, folderDefault, "A / B"),
         ]) else { return }
         let url = v[0].trimmingCharacters(in: .whitespacesAndNewlines)
         guard !url.isEmpty else { return }
@@ -390,12 +392,12 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
 
     @objc func editSelected() {
         guard let b = targetBookmarks().first else { return }
-        guard let v = runForm(title: "编辑书签", okTitle: "保存", fields: [
-            ("标题", b.title, ""),
+        guard let v = runForm(title: L10n.formEditTitle, okTitle: L10n.btnSave, fields: [
+            (L10n.fieldTitle, b.title, ""),
             ("URL", b.url, ""),
-            ("描述", b.excerpt, ""),
-            ("备注", b.note, ""),
-            ("文件夹", b.folder, ""),
+            (L10n.fieldDescription, b.excerpt, ""),
+            (L10n.fieldNote, b.note, ""),
+            (L10n.fieldFolder, b.folder, ""),
         ]) else { return }
         performWrite {
             try runner.edit(id: b.id, title: v[0], url: v[1], excerpt: v[2], note: v[3], folder: v[4])
@@ -406,10 +408,12 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
         let bms = targetBookmarks()
         guard !bms.isEmpty else { return }
         let alert = NSAlert()
-        alert.messageText = bms.count == 1 ? "删除「\(displayTitle(bms[0]))」？" : "删除选中的 \(bms.count) 条书签？"
-        alert.informativeText = "此操作不可撤销。"
-        alert.addButton(withTitle: "删除")
-        alert.addButton(withTitle: "取消")
+        alert.messageText = bms.count == 1
+            ? L10n.deleteConfirmOne(displayTitle(bms[0]))
+            : L10n.deleteConfirmMany(bms.count)
+        alert.informativeText = L10n.deleteIrreversible
+        alert.addButton(withTitle: L10n.btnDelete)
+        alert.addButton(withTitle: L10n.btnCancel)
         alert.alertStyle = .warning
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         performWrite { for b in bms { try runner.remove(id: b.id) } }
@@ -431,8 +435,8 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
 
     @objc private func renameSelectedFolder() {
         guard let node = clickedFolder(), node.kind == .normal else { return }
-        guard let v = runForm(title: "重命名 / 移动文件夹", okTitle: "重命名", fields: [
-            ("新路径", node.path, "A / B"),
+        guard let v = runForm(title: L10n.formRenameTitle, okTitle: L10n.btnRename, fields: [
+            (L10n.fieldNewPath, node.path, "A / B"),
         ]) else { return }
         let newPath = v[0].trimmingCharacters(in: .whitespacesAndNewlines)
         guard !newPath.isEmpty, newPath != node.path else { return }
@@ -445,7 +449,7 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
             try action()
             reload()
         } catch {
-            showError(error, title: "操作失败")
+            showError(error, title: L10n.errorOperationFailed)
         }
     }
 
@@ -476,17 +480,17 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
 
     private func makeTableContextMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(withTitle: "打开", action: #selector(openSelected), keyEquivalent: "")
-        menu.addItem(withTitle: "编辑…", action: #selector(editSelected), keyEquivalent: "")
+        menu.addItem(withTitle: L10n.menuOpen, action: #selector(openSelected), keyEquivalent: "")
+        menu.addItem(withTitle: L10n.menuEditItem, action: #selector(editSelected), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "删除", action: #selector(deleteSelected), keyEquivalent: "")
+        menu.addItem(withTitle: L10n.menuDelete, action: #selector(deleteSelected), keyEquivalent: "")
         menu.items.forEach { $0.target = self }
         return menu
     }
 
     private func makeOutlineContextMenu() -> NSMenu {
         let menu = NSMenu()
-        let item = NSMenuItem(title: "重命名 / 移动…", action: #selector(renameSelectedFolder), keyEquivalent: "")
+        let item = NSMenuItem(title: L10n.contextRenameMove, action: #selector(renameSelectedFolder), keyEquivalent: "")
         item.target = self
         menu.addItem(item)
         return menu
@@ -500,7 +504,7 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
         let alert = NSAlert()
         alert.messageText = title
         alert.addButton(withTitle: okTitle)
-        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: L10n.btnCancel)
 
         let labelWidth: CGFloat = 56
         let fieldWidth: CGFloat = 340

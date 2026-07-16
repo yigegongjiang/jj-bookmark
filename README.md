@@ -12,8 +12,8 @@
 
 ## 使用
 
-- CLI：`jj-bookmark-cli/` 构建出二进制 `jj-bookmark`，提供保存 / 编辑 / 查询 / 删除 / 打开 + CSV 导入 + 元数据抓取；命令详见 `jj-bookmark --help`。
-- App：`jj-bookmark-app/` 由 `package.sh` 组装出 macOS `.app`，桌面端浏览 / 编辑；bundle 内嵌同版本 CLI 作运行核心，无需另装 CLI（`~/.local/bin` 安装仅为方便终端调用，可选）。偏好设置（⌘,）含闲置自动退出（默认 1 分钟，可选 1 / 5 / 10 / 自定义）、CLI 安装·重装、检查更新。
+- CLI：`jj-bookmark-cli/` 构建出二进制 `jj-bookmark`，提供保存 / 编辑 / 查询 / 删除 / 打开 + CSV 导入 + 元数据抓取；命令详见 `jj-bookmark --help`（输出仅英文）。
+- App：`jj-bookmark-app/` 由 `package.sh` 组装出 macOS `.app`，桌面端浏览 / 编辑；bundle 内嵌同版本 CLI 作运行核心，无需另装 CLI（`~/.local/bin` 安装仅为方便终端调用，可选）。偏好设置（⌘,）含闲置自动退出（默认 1 分钟，可选 1 / 5 / 10 / 自定义）、CLI 安装·重装、检查更新。界面随系统语言切换（中 / 日 / 英，非中日语系默认英文）。
 - 数据文件：`~/.config/jj-bookmark/bookmarks.json`（pretty JSON，可手改 / `jq` 处理）。
 
 ## 架构

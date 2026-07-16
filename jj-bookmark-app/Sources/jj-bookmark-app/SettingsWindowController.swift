@@ -8,12 +8,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let autoExit: AutoExitManager
 
     private let enabledCheck = NSButton(
-        checkboxWithTitle: "闲置一段时间后自动退出 App", target: nil, action: nil)
+        checkboxWithTitle: L10n.autoExitCheckbox, target: nil, action: nil)
     private let presetPopup = NSPopUpButton()
     private let customField = NSTextField()
     private let customStepper = NSStepper()
     private let customRow = NSStackView()
-    private let customSuffix = NSTextField(labelWithString: "分钟")
+    private let customSuffix = NSTextField(labelWithString: L10n.unitMinutes)
     private let cliStatusLabel = NSTextField(labelWithString: "")
 
     private static let customTag = -1  // 预设外的「自定义」项
@@ -27,7 +27,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             contentRect: NSRect(x: 0, y: 0, width: 460, height: 320),
             styleMask: [.titled, .closable],
             backing: .buffered, defer: false)
-        window.title = "偏好设置"
+        window.title = L10n.settingsTitle
         super.init(window: window)
         window.delegate = self
         window.contentView = buildContent()
@@ -47,17 +47,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     // MARK: - 布局
 
     private func buildContent() -> NSView {
-        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知"
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? L10n.valueUnknown
 
         enabledCheck.target = self
         enabledCheck.action = #selector(toggleEnabled)
 
         // 预设 1/5/10 分钟 + 自定义。
         for m in AutoExitManager.presets {
-            presetPopup.addItem(withTitle: "\(m) 分钟")
+            presetPopup.addItem(withTitle: L10n.presetMinutes(m))
             presetPopup.lastItem?.tag = m
         }
-        presetPopup.addItem(withTitle: "自定义…")
+        presetPopup.addItem(withTitle: L10n.custom)
         presetPopup.lastItem?.tag = Self.customTag
         presetPopup.target = self
         presetPopup.action = #selector(presetChanged)
@@ -79,7 +79,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         customRow.setViews([customField, customStepper, customSuffix], in: .leading)
 
         let intervalRow = NSStackView(views: [
-            NSTextField(labelWithString: "闲置时长"), presetPopup, customRow,
+            NSTextField(labelWithString: L10n.idleDuration), presetPopup, customRow,
         ])
         intervalRow.orientation = .horizontal
         intervalRow.spacing = 8
@@ -88,22 +88,22 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         cliStatusLabel.lineBreakMode = .byWordWrapping
         cliStatusLabel.maximumNumberOfLines = 2
         let reinstallButton = NSButton(
-            title: "安装 / 重装到 ~/.local/bin", target: self, action: #selector(reinstallCLI))
+            title: L10n.btnInstallReinstall, target: self, action: #selector(reinstallCLI))
         let updateButton = NSButton(
-            title: "检查更新（打开 Releases 页面）", target: self, action: #selector(checkForUpdates))
+            title: L10n.btnCheckUpdates, target: self, action: #selector(checkForUpdates))
 
         let stack = NSStackView(views: [
-            sectionHeader("自动退出"),
+            sectionHeader(L10n.sectionAutoExit),
             enabledCheck,
             intervalRow,
-            hint("低频使用时打开 link 后常忘记关闭；到点自动退出。可随时关闭此项。"),
+            hint(L10n.hintAutoExit),
             separator(),
-            sectionHeader("命令行工具（CLI）"),
+            sectionHeader(L10n.sectionCLI),
             cliStatusLabel,
             reinstallButton,
             separator(),
-            sectionHeader("关于 · 更新"),
-            NSTextField(labelWithString: "当前版本：\(appVersion)"),
+            sectionHeader(L10n.sectionAbout),
+            NSTextField(labelWithString: L10n.currentVersion(appVersion)),
             updateButton,
         ])
         stack.orientation = .vertical
@@ -177,9 +177,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func refreshCLIStatus() {
-        let bundle = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知"
-        let installed = CLIInstaller.installedVersion() ?? "未安装"
-        cliStatusLabel.stringValue = "App 内嵌：\(bundle)    ~/.local/bin：\(installed)"
+        let bundle = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? L10n.valueUnknown
+        let installed = CLIInstaller.installedVersion() ?? L10n.valueNotInstalled
+        cliStatusLabel.stringValue = L10n.cliStatus(bundle: bundle, installed: installed)
     }
 
     // MARK: - Actions

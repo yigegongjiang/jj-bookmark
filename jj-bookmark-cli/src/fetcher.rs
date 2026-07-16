@@ -19,16 +19,16 @@ pub fn fetch(url: &str, timeout: Duration) -> Result<Meta> {
         .timeout(timeout)
         .user_agent("Mozilla/5.0 (compatible; jj-bookmark/1.0; +https://github.com/yigegongjiang/jj-bookmark)")
         .build()
-        .context("构建 HTTP 客户端失败")?;
+        .context("failed to build HTTP client")?;
 
     let body = client
         .get(url)
         .send()
-        .with_context(|| format!("请求失败: {url}"))?
+        .with_context(|| format!("request failed: {url}"))?
         .error_for_status()
-        .with_context(|| format!("HTTP 状态错误: {url}"))?
+        .with_context(|| format!("HTTP status error: {url}"))?
         .text()
-        .context("读取响应正文失败")?;
+        .context("failed to read response body")?;
 
     Ok(parse_meta(&body))
 }

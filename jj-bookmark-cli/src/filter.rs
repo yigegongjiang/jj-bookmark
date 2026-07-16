@@ -11,7 +11,7 @@ use jaq_json::{Val, read};
 /// 对 `input_json`（一段 JSON 文本）执行 jq `filter`，返回输出值序列（转回 serde_json::Value）。
 pub fn run_filter(input_json: &str, filter: &str) -> Result<Vec<serde_json::Value>> {
     let input =
-        read::parse_single(input_json.as_bytes()).map_err(|e| anyhow!("解析输入 JSON 失败: {e:?}"))?;
+        read::parse_single(input_json.as_bytes()).map_err(|e| anyhow!("failed to parse input JSON: {e:?}"))?;
 
     let program = File { code: filter, path: () };
     let defs = jaq_core::defs().chain(jaq_std::defs()).chain(jaq_json::defs());
@@ -21,22 +21,22 @@ pub fn run_filter(input_json: &str, filter: &str) -> Result<Vec<serde_json::Valu
     let arena = Arena::default();
     let modules = loader
         .load(&arena, program)
-        .map_err(|_| anyhow!("jq 过滤器语法错误: {filter}"))?;
+        .map_err(|_| anyhow!("jq filter syntax error: {filter}"))?;
 
     let compiled = Compiler::default()
         .with_funs(funs)
         .compile(modules)
-        .map_err(|_| anyhow!("jq 过滤器编译失败: {filter}"))?;
+        .map_err(|_| anyhow!("jq filter compilation failed: {filter}"))?;
 
     let ctx = Ctx::<data::JustLut<Val>>::new(&compiled.lut, Vars::new([]));
     let outputs = compiled.id.run((ctx, input)).map(unwrap_valr);
 
     let mut results = Vec::new();
     for item in outputs {
-        let val = item.map_err(|e| anyhow!("jq 执行错误: {e:?}"))?;
+        let val = item.map_err(|e| anyhow!("jq execution error: {e:?}"))?;
         // Val 的 Display 即紧凑 JSON；转回 serde_json::Value 供上层反序列化为 Bookmark。
         let v: serde_json::Value =
-            serde_json::from_str(&val.to_string()).map_err(|e| anyhow!("jq 输出无法解析为 JSON: {e}"))?;
+            serde_json::from_str(&val.to_string()).map_err(|e| anyhow!("jq output cannot be parsed as JSON: {e}"))?;
         results.push(v);
     }
     Ok(results)

@@ -28,7 +28,7 @@ impl Paths {
         let dir = match std::env::var_os("JJ_BOOKMARK_DIR") {
             Some(d) => PathBuf::from(d),
             None => {
-                let home = std::env::var_os("HOME").context("环境变量 HOME 未设置")?;
+                let home = std::env::var_os("HOME").context("environment variable HOME is not set")?;
                 PathBuf::from(home).join(".config").join("jj-bookmark")
             }
         };
@@ -53,16 +53,16 @@ pub fn read_store(paths: &Paths) -> Result<Store> {
         return Ok(Store::default());
     }
     let bytes =
-        fs::read(&paths.data).with_context(|| format!("读取失败: {}", paths.data.display()))?;
+        fs::read(&paths.data).with_context(|| format!("read failed: {}", paths.data.display()))?;
     let store: Store = serde_json::from_slice(&bytes).map_err(|e| {
         anyhow!(
-            "解析 {} 失败: {e}。原文件与 .bak 已保留，请用 jq 修复后重试。",
+            "failed to parse {}: {e}. The original file and .bak are preserved; fix it with jq and retry.",
             paths.data.display()
         )
     })?;
     if store.version > CURRENT_VERSION {
         bail!(
-            "数据文件 version {} 高于本程序支持的 {}，请升级 jj-bookmark。",
+            "data file version {} is higher than this program supports ({}); please upgrade jj-bookmark.",
             store.version,
             CURRENT_VERSION
         );
@@ -77,7 +77,7 @@ where
     F: FnOnce(&mut Store) -> Result<T>,
 {
     fs::create_dir_all(&paths.dir)
-        .with_context(|| format!("创建数据目录失败: {}", paths.dir.display()))?;
+        .with_context(|| format!("failed to create data directory: {}", paths.dir.display()))?;
     let _guard = FlockGuard::acquire(&paths.lock)?; // 锁在独立锁文件上
     let mut store = read_store(paths)?; // 锁内从磁盘重读，吸收并发写 / 手改
     let result = f(&mut store)?;
@@ -89,27 +89,27 @@ where
 
 /// 原子写：写 tmp → fsync → 备份现有 → rename 覆盖 → fsync 目录。
 fn write_atomic(paths: &Paths, store: &Store) -> Result<()> {
-    let mut data = serde_json::to_vec_pretty(store).context("序列化 JSON 失败")?;
+    let mut data = serde_json::to_vec_pretty(store).context("failed to serialize JSON")?;
     data.push(b'\n'); // 末尾换行，文件更友好
     {
         let mut f = File::create(&paths.tmp)
-            .with_context(|| format!("创建临时文件失败: {}", paths.tmp.display()))?;
-        f.write_all(&data).context("写入临时文件失败")?;
-        f.sync_all().context("fsync 临时文件失败")?;
+            .with_context(|| format!("failed to create temp file: {}", paths.tmp.display()))?;
+        f.write_all(&data).context("failed to write temp file")?;
+        f.sync_all().context("failed to fsync temp file")?;
     }
     if paths.data.exists() {
         fs::copy(&paths.data, &paths.bak)
-            .with_context(|| format!("备份到 .bak 失败: {}", paths.bak.display()))?;
+            .with_context(|| format!("failed to back up to .bak: {}", paths.bak.display()))?;
     }
     fs::rename(&paths.tmp, &paths.data)
-        .with_context(|| format!("原子 rename 失败: {}", paths.data.display()))?;
+        .with_context(|| format!("atomic rename failed: {}", paths.data.display()))?;
     fsync_dir(&paths.dir)?;
     Ok(())
 }
 
 fn fsync_dir(dir: &Path) -> Result<()> {
-    let f = File::open(dir).with_context(|| format!("打开目录失败: {}", dir.display()))?;
-    f.sync_all().context("fsync 目录失败")?;
+    let f = File::open(dir).with_context(|| format!("failed to open directory: {}", dir.display()))?;
+    f.sync_all().context("failed to fsync directory")?;
     Ok(())
 }
 
@@ -125,7 +125,7 @@ impl FlockGuard {
             .write(true)
             .truncate(false)
             .open(lock_path)
-            .with_context(|| format!("打开锁文件失败: {}", lock_path.display()))?;
+            .with_context(|| format!("failed to open lock file: {}", lock_path.display()))?;
         let fd = file.as_raw_fd();
         loop {
             let ret = unsafe { libc::flock(fd, libc::LOCK_EX) };
@@ -136,7 +136,7 @@ impl FlockGuard {
             if err.raw_os_error() == Some(libc::EINTR) {
                 continue; // 被信号打断，重试
             }
-            return Err(err).context("flock 加锁失败");
+            return Err(err).context("failed to acquire flock");
         }
         Ok(FlockGuard { _file: file })
     }

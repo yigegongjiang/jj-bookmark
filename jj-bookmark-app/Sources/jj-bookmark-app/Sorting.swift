@@ -6,10 +6,10 @@ nonisolated enum SortKey: String, CaseIterable, Sendable {
 
     var label: String {
         switch self {
-        case .created: return "添加时间"
-        case .updated: return "编辑时间"
-        case .visited: return "最近访问"
-        case .title: return "名称"
+        case .created: return L10n.sortCreated
+        case .updated: return L10n.sortUpdated
+        case .visited: return L10n.sortVisited
+        case .title: return L10n.sortTitle
         }
     }
 

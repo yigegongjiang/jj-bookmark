@@ -21,7 +21,7 @@ use query::{Order, SortKey};
 use store::{Paths, mutate, read_store};
 
 #[derive(Parser)]
-#[command(name = "jj-bookmark", version, about = "书签工具")]
+#[command(name = "jj-bookmark", version, about = "Bookmark tool")]
 struct Cli {
     #[command(subcommand)]
     cmd: Command,
@@ -29,9 +29,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// 新增书签
+    /// Add a bookmark
     Add {
-        /// 目标 URL
+        /// Target URL
         url: String,
         #[arg(long)]
         title: Option<String>,
@@ -39,11 +39,11 @@ enum Command {
         folder: Option<String>,
         #[arg(long)]
         note: Option<String>,
-        /// 立即同步抓取元数据（默认不抓以免阻塞；App 用后台 fetch）
+        /// Fetch metadata synchronously now (off by default to avoid blocking; the App fetches in the background)
         #[arg(long)]
         fetch: bool,
     },
-    /// 列出书签（支持排序）
+    /// List bookmarks (sortable)
     Ls {
         #[arg(long)]
         folder: Option<String>,
@@ -51,15 +51,15 @@ enum Command {
         sort: SortKey,
         #[arg(long, value_enum)]
         order: Option<Order>,
-        /// 输出 --json 契约（App/脚本消费）
+        /// Emit the --json contract (consumed by the App/scripts)
         #[arg(long)]
         json: bool,
     },
-    /// 模糊搜索 title/url/excerpt（支持排序）；`--filter` 收原生 jq 过滤器（内嵌 jaq 执行）
+    /// Fuzzy-search title/url/excerpt (sortable); `--filter` takes a native jq filter (run by embedded jaq)
     Query {
-        /// 关键词（可为空字符串以匹配全部，配合 --filter 使用）
+        /// Keyword (may be an empty string to match all, used with --filter)
         keyword: String,
-        /// 原生 jq 过滤器；输入为 {version, bookmarks}，输出须为书签对象（如 `.bookmarks[] | select(.favorite)`）
+        /// Native jq filter; input is {version, bookmarks}, output must be bookmark objects (e.g. `.bookmarks[] | select(.favorite)`)
         #[arg(long)]
         filter: Option<String>,
         #[arg(long)]
@@ -71,9 +71,9 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
-    /// 用默认浏览器打开 URL 并记录最近访问
+    /// Open the URL in the default browser and record the last visit
     Open { id: i64 },
-    /// 编辑字段
+    /// Edit fields
     Edit {
         id: i64,
         #[arg(long)]
@@ -87,23 +87,23 @@ enum Command {
         #[arg(long)]
         excerpt: Option<String>,
     },
-    /// 删除书签
+    /// Delete a bookmark
     Rm { id: i64 },
-    /// 抓取并回填元数据（title/excerpt/cover）
+    /// Fetch and backfill metadata (title/excerpt/cover)
     Fetch {
         id: i64,
-        /// 覆盖已有字段（默认只填空字段，不覆盖用户内容）
+        /// Overwrite existing fields (by default only empty fields are filled, never user content)
         #[arg(long)]
         force: bool,
     },
-    /// 重命名 / 移动 folder 子树（前缀替换所有匹配项，单次原子写）
+    /// Rename / move a folder subtree (prefix-replace all matches, single atomic write)
     Mv {
-        /// 旧 folder 路径（含其所有后代）
+        /// Old folder path (including all its descendants)
         old: String,
-        /// 新 folder 路径
+        /// New folder path
         new: String,
     },
-    /// 从 raindrop CSV 导入
+    /// Import from a raindrop CSV
     Import { csv: PathBuf },
 }
 
@@ -149,11 +149,11 @@ fn cmd_add(
             .push(Bookmark::new(id, url.clone(), title.clone(), folder.clone(), note.clone()));
         Ok(id)
     })?;
-    println!("已添加 #{id}");
+    println!("Added #{id}");
     if fetch {
         // 同步抓取；失败不回滚（书签已保存），仅告警。
         if let Err(e) = fetch_and_apply(paths, id, false) {
-            eprintln!("警告：元数据抓取失败（书签已保存）：{e:#}");
+            eprintln!("Warning: metadata fetch failed (bookmark saved): {e:#}");
         }
     }
     Ok(())
@@ -161,7 +161,7 @@ fn cmd_add(
 
 fn cmd_fetch(paths: &Paths, id: i64, force: bool) -> Result<()> {
     fetch_and_apply(paths, id, force)?;
-    println!("已抓取 #{id}");
+    println!("Fetched #{id}");
     Ok(())
 }
 
@@ -172,12 +172,12 @@ fn fetch_and_apply(paths: &Paths, id: i64, force: bool) -> Result<()> {
         let store = read_store(paths)?;
         store.bookmarks.iter().find(|b| b.id == id).map(|b| b.url.clone())
     }
-    .ok_or_else(|| anyhow!("找不到书签 #{id}"))?;
+    .ok_or_else(|| anyhow!("bookmark #{id} not found"))?;
 
     let meta = fetcher::fetch(&url, Duration::from_secs(10))?;
 
     mutate(paths, |store| {
-        let b = store.find_mut(id).ok_or_else(|| anyhow!("找不到书签 #{id}"))?;
+        let b = store.find_mut(id).ok_or_else(|| anyhow!("bookmark #{id} not found"))?;
         let mut changed = false;
         // title 占位（== url）或空时才回填，避免覆盖用户已设标题（除非 --force）。
         if let Some(t) = meta.title
@@ -250,8 +250,8 @@ fn apply_jq_filter(bms: &[Bookmark], version: u32, jq: &str) -> Result<Vec<Bookm
         for item in items {
             let b: Bookmark = serde_json::from_value(item).map_err(|e| {
                 anyhow!(
-                    "--filter 的输出不是书签对象（{e}）。query 只返回书签；\
-                     如需任意 jq 输出，请直接对数据文件运行 jq。"
+                    "--filter output is not a bookmark object ({e}). query only returns bookmarks; \
+                     for arbitrary jq output, run jq directly against the data file."
                 )
             })?;
             result.push(b);
@@ -262,15 +262,15 @@ fn apply_jq_filter(bms: &[Bookmark], version: u32, jq: &str) -> Result<Vec<Bookm
 
 fn cmd_open(paths: &Paths, id: i64) -> Result<()> {
     let url = mutate(paths, |store| {
-        let b = store.find_mut(id).ok_or_else(|| anyhow!("找不到书签 #{id}"))?;
+        let b = store.find_mut(id).ok_or_else(|| anyhow!("bookmark #{id} not found"))?;
         b.last_visited = now_millis(); // 记录访问；不改 updated（访问 ≠ 内容修改）
         Ok(b.url.clone())
     })?;
     std::process::Command::new("open")
         .arg(&url)
         .spawn()
-        .with_context(|| format!("调用系统 open 失败: {url}"))?;
-    println!("已打开 #{id}: {url}");
+        .with_context(|| format!("failed to invoke system open: {url}"))?;
+    println!("Opened #{id}: {url}");
     Ok(())
 }
 
@@ -284,10 +284,10 @@ fn cmd_edit(
     excerpt: Option<String>,
 ) -> Result<()> {
     if title.is_none() && url.is_none() && folder.is_none() && note.is_none() && excerpt.is_none() {
-        bail!("未提供任何要修改的字段（--title/--url/--folder/--note/--excerpt）");
+        bail!("no fields provided to modify (--title/--url/--folder/--note/--excerpt)");
     }
     mutate(paths, |store| {
-        let b = store.find_mut(id).ok_or_else(|| anyhow!("找不到书签 #{id}"))?;
+        let b = store.find_mut(id).ok_or_else(|| anyhow!("bookmark #{id} not found"))?;
         if let Some(t) = title {
             b.title = t;
         }
@@ -306,7 +306,7 @@ fn cmd_edit(
         b.updated = now_millis(); // 内容修改 → 更新 updated
         Ok(())
     })?;
-    println!("已更新 #{id}");
+    println!("Updated #{id}");
     Ok(())
 }
 
@@ -315,11 +315,11 @@ fn cmd_rm(paths: &Paths, id: i64) -> Result<()> {
         let before = store.bookmarks.len();
         store.bookmarks.retain(|b| b.id != id);
         if store.bookmarks.len() == before {
-            bail!("找不到书签 #{id}"); // 在锁内报错 → 不产生无谓写
+            bail!("bookmark #{id} not found"); // 在锁内报错 → 不产生无谓写
         }
         Ok(())
     })?;
-    println!("已删除 #{id}");
+    println!("Deleted #{id}");
     Ok(())
 }
 
@@ -340,11 +340,11 @@ fn cmd_mv(paths: &Paths, old: String, new: String) -> Result<()> {
             moved += 1;
         }
         if moved == 0 {
-            bail!("没有 folder 匹配 {old:?}");
+            bail!("no folder matches {old:?}");
         }
         Ok(moved)
     })?;
-    println!("已移动 {n} 条：{old} → {new}");
+    println!("Moved {n} bookmark(s): {old} → {new}");
     Ok(())
 }
 
@@ -364,7 +364,7 @@ fn cmd_import(paths: &Paths, csv: &Path) -> Result<()> {
         }
         Ok((imported, skipped))
     })?;
-    println!("导入完成：解析 {total} 条，新增 {imported}，跳过 {skipped}（id 已存在）");
+    println!("Import complete: {total} parsed, {imported} added, {skipped} skipped (id already exists)");
     Ok(())
 }
 

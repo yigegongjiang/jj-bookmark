@@ -11,8 +11,8 @@ nonisolated struct CLIRunner: Sendable {
 
         var errorDescription: String? {
             switch self {
-            case .notFound(let p): return "找不到内嵌 CLI：\(p)"
-            case .failed(_, let s): return s.isEmpty ? "CLI 执行失败" : s
+            case .notFound(let p): return L10n.errorCLINotFound(p)
+            case .failed(_, let s): return s.isEmpty ? L10n.errorCLIFailed : s
             }
         }
     }

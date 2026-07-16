@@ -20,8 +20,7 @@ enum CLIInstaller {
             // 未安装：首启询问一次（记住已问，避免每次弹）。
             guard !UserDefaults.standard.bool(forKey: "cliInstallOffered") else { return }
             UserDefaults.standard.set(true, forKey: "cliInstallOffered")
-            if confirm(title: "安装命令行工具？", okTitle: "安装",
-                       text: "将 jj-bookmark 安装到 ~/.local/bin，便于终端使用（请确保该目录在 PATH 中）。") {
+            if confirm(title: L10n.installTitle, okTitle: L10n.btnInstall, text: L10n.installText) {
                 copyCLI(from: runner.executableURL)
             }
             return
@@ -29,8 +28,8 @@ enum CLIInstaller {
 
         // 已安装：仅当版本不一致才询问更新。
         guard let installed = installedVersion(), installed != bundleVersion else { return }
-        if confirm(title: "更新命令行工具？", okTitle: "更新",
-                   text: "~/.local/bin 中的 jj-bookmark 为 \(installed)，App 内嵌为 \(bundleVersion)。是否更新？") {
+        if confirm(title: L10n.updateTitle, okTitle: L10n.btnUpdate,
+                   text: L10n.updateText(installed: installed, bundle: bundleVersion)) {
             copyCLI(from: runner.executableURL)
         }
     }
@@ -41,11 +40,11 @@ enum CLIInstaller {
         let ok = copyCLI(from: runner.executableURL)
         let alert = NSAlert()
         if ok {
-            alert.messageText = "命令行工具已安装"
-            alert.informativeText = "jj-bookmark 已复制到 \(target.path)\n请确保 ~/.local/bin 在 PATH 中。"
+            alert.messageText = L10n.installedTitle
+            alert.informativeText = L10n.installedText(target.path)
         } else {
-            alert.messageText = "安装失败"
-            alert.informativeText = "无法写入 \(target.path)，详见 Console 日志。"
+            alert.messageText = L10n.installFailedTitle
+            alert.informativeText = L10n.installFailedText(target.path)
             alert.alertStyle = .warning
         }
         alert.runModal()
@@ -89,7 +88,7 @@ enum CLIInstaller {
         alert.messageText = title
         alert.informativeText = text
         alert.addButton(withTitle: okTitle)
-        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: L10n.btnCancel)
         return alert.runModal() == .alertFirstButtonReturn
     }
 }

@@ -7,6 +7,13 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.3.0] - 2026-07-16
+
+- App 多语言界面：中文 / 日文 / 英文，随系统语言自动切换（非中日语系默认英文）
+  - 纯 Swift 本地化表 `L10n`(`nonisolated`, `Locale.preferredLanguages` 判定, 英文兜底); 无 .lproj/NSLocalizedString/package.sh 改动; `Info.plist` 加 `CFBundleDevelopmentRegion=en`; env `JJ_BOOKMARK_DUMP_L10N` 无头自检
+- 命令行工具输出改为英文
+  - clap help + 运行时/错误字符串全量英译; 保留 `#<id>` 连续格式(App add 解析依赖); 注释/测试数据不动
+
 ## [0.2.0] - 2026-07-16
 
 - 偏好设置窗口（⌘,）：集中管理自动退出、命令行工具安装 / 重装、检查更新

@@ -11,6 +11,16 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.3.0] - 2026-07-16
+
+### Added
+
+- App 多语言界面：中文 / 日文 / 英文，随系统语言自动切换（非中日语系默认英文）
+
+### Changed
+
+- 命令行工具输出改为英文
+
 ## [0.2.0] - 2026-07-16
 
 ### Added

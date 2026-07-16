@@ -52,7 +52,7 @@ pub fn parse_iso8601_to_millis(s: &str) -> Result<i64> {
     let (date, time_tz) = s
         .split_once('T')
         .or_else(|| s.split_once(' '))
-        .ok_or_else(|| anyhow!("时间戳缺少日期/时间分隔符: {s:?}"))?;
+        .ok_or_else(|| anyhow!("timestamp missing date/time separator: {s:?}"))?;
 
     // 日期
     let mut dp = date.split('-');
@@ -61,7 +61,7 @@ pub fn parse_iso8601_to_millis(s: &str) -> Result<i64> {
     let d = next_num(&mut dp, s)?;
 
     // 拆分时区
-    let (time, offset_secs) = split_offset(time_tz).with_context(|| format!("无法解析时区: {s:?}"))?;
+    let (time, offset_secs) = split_offset(time_tz).with_context(|| format!("failed to parse time zone: {s:?}"))?;
 
     // 时:分:秒[.毫秒]
     let mut tp = time.split(':');
@@ -69,7 +69,7 @@ pub fn parse_iso8601_to_millis(s: &str) -> Result<i64> {
     let mm = next_num(&mut tp, s)?;
     let sec_part = tp
         .next()
-        .ok_or_else(|| anyhow!("时间戳缺少秒: {s:?}"))?;
+        .ok_or_else(|| anyhow!("timestamp missing seconds: {s:?}"))?;
     let (ss, millis) = match sec_part.split_once('.') {
         Some((sec, frac)) => (parse_i64(sec, s)?, parse_frac_millis(frac)),
         None => (parse_i64(sec_part, s)?, 0),
@@ -112,14 +112,14 @@ fn parse_frac_millis(frac: &str) -> i64 {
 }
 
 fn next_num<'a, I: Iterator<Item = &'a str>>(it: &mut I, ctx: &str) -> Result<i64> {
-    let part = it.next().ok_or_else(|| anyhow!("时间戳字段不足: {ctx:?}"))?;
+    let part = it.next().ok_or_else(|| anyhow!("not enough timestamp fields: {ctx:?}"))?;
     parse_i64(part, ctx)
 }
 
 fn parse_i64(s: &str, ctx: &str) -> Result<i64> {
     s.trim()
         .parse()
-        .with_context(|| format!("时间戳数字解析失败 ({s:?} in {ctx:?})"))
+        .with_context(|| format!("failed to parse timestamp number ({s:?} in {ctx:?})"))
 }
 
 #[cfg(test)]

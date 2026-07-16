@@ -17,7 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             showSettings(nil)
             if let cv = settingsController?.window?.contentView {
                 cv.layoutSubtreeIfNeeded()
-                NSLog("jj-bookmark[selfcheck] settings window=\(settingsController!.window!.frame.size) fitting=\(cv.fittingSize)")
+                NSLog("jj-bookmark[selfcheck] lang=\(L10n.lang) settings window=\(settingsController!.window!.frame.size) fitting=\(cv.fittingSize)")
             }
         }
     }
@@ -43,8 +43,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             CLIInstaller.installIfNeeded(runner: runner)
         } catch {
             let alert = NSAlert()
-            alert.messageText = "无法定位内嵌 CLI"
-            alert.informativeText = "\(error.localizedDescription)\n\n开发运行时可设 JJ_BOOKMARK_CLI 指向 CLI 二进制。"
+            alert.messageText = L10n.errorLocateCLITitle
+            alert.informativeText = L10n.errorLocateCLIText(error.localizedDescription)
             alert.alertStyle = .critical
             alert.runModal()
         }

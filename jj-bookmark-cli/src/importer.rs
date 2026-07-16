@@ -13,9 +13,9 @@ pub fn parse_raindrop_csv(path: &Path) -> Result<Vec<Bookmark>> {
         .has_headers(true)
         .flexible(true)
         .from_path(path)
-        .with_context(|| format!("打开 CSV 失败: {}", path.display()))?;
+        .with_context(|| format!("failed to open CSV: {}", path.display()))?;
 
-    let headers = rdr.headers().context("读取 CSV 表头失败")?.clone();
+    let headers = rdr.headers().context("failed to read CSV header")?.clone();
     let col = |name: &str| headers.iter().position(|h| h == name);
     let (ci_id, ci_title, ci_note, ci_excerpt, ci_url, ci_folder, ci_tags, ci_created, ci_cover, ci_fav) = (
         col("id"), col("title"), col("note"), col("excerpt"), col("url"),
@@ -24,7 +24,7 @@ pub fn parse_raindrop_csv(path: &Path) -> Result<Vec<Bookmark>> {
 
     let mut out = Vec::new();
     for (i, rec) in rdr.records().enumerate() {
-        let rec = rec.with_context(|| format!("解析 CSV 第 {} 行失败", i + 2))?;
+        let rec = rec.with_context(|| format!("failed to parse CSV row {}", i + 2))?;
         let get = |ci: Option<usize>| ci.and_then(|c| rec.get(c)).unwrap_or("").to_string();
 
         let url = get(ci_url);

@@ -13,7 +13,7 @@ pub fn print_json(bms: &[Bookmark], version: u32) -> Result<()> {
         bookmarks: &'a [Bookmark],
     }
     let s = serde_json::to_string_pretty(&Out { version, bookmarks: bms })
-        .context("序列化 --json 输出失败")?;
+        .context("failed to serialize --json output")?;
     println!("{s}");
     Ok(())
 }
@@ -21,9 +21,10 @@ pub fn print_json(bms: &[Bookmark], version: u32) -> Result<()> {
 /// 人类可读列表（stdout 内容行 + stderr 计数），供终端浏览；App/脚本请用 `--json`。
 pub fn print_human(bms: &[Bookmark]) {
     for b in bms {
-        let folder = if b.folder.is_empty() { "未分类" } else { &b.folder };
+        let folder = if b.folder.is_empty() { "Uncategorized" } else { &b.folder };
         println!("{}  {}", b.id, b.title);
         println!("      {}  ·  {}  ·  {}", folder, b.created_jst, b.url);
     }
-    eprintln!("({} 条)", bms.len());
+    let n = bms.len();
+    eprintln!("({n} {})", if n == 1 { "item" } else { "items" });
 }

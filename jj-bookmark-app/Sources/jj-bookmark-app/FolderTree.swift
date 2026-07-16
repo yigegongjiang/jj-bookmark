@@ -83,12 +83,12 @@ enum FolderTree {
         topLevel.forEach(sortRec)
 
         var result: [FolderNode] = []
-        let all = FolderNode(kind: .all, name: "全部", path: "")
+        let all = FolderNode(kind: .all, name: L10n.folderAll, path: "")
         all.count = bookmarks.count
         result.append(all)
         result.append(contentsOf: topLevel)
         if uncategorized > 0 {
-            let u = FolderNode(kind: .uncategorized, name: "未分类", path: "")
+            let u = FolderNode(kind: .uncategorized, name: L10n.folderUncategorized, path: "")
             u.count = uncategorized
             result.append(u)
         }

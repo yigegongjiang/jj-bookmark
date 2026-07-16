@@ -7,6 +7,11 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.4.0] - 2026-07-16
+
+- 记住主窗口尺寸；每次在鼠标所在的屏幕居中打开（多显示器友好）
+  - AppDelegate 手动持久化 content 尺寸到 UserDefaults(避开 setFrameAutosaveName/系统状态恢复冲突; 存 content 尺寸防标题栏高度漂移); launchContentSize() clamp 到鼠标屏 visibleFrame; windowDidResize/WillClose 落盘; isRestorable=false; env JJ_BOOKMARK_DUMP_WINDOW 自检
+
 ## [0.3.0] - 2026-07-16
 
 - App 多语言界面：中文 / 日文 / 英文，随系统语言自动切换（非中日语系默认英文）

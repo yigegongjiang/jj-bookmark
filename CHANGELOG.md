@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.4.0] - 2026-07-16
+
+### Added
+
+- 记住主窗口尺寸；每次在鼠标所在的屏幕居中打开（多显示器友好）
+
 ## [0.3.0] - 2026-07-16
 
 ### Added

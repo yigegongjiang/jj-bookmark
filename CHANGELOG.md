@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.6.0] - 2026-07-16
+
+### Changed
+
+- 书签列表显示完整网址，仅用红色突出可注册主域名，便于快速定位站点
+
 ## [0.5.0] - 2026-07-16
 
 ### Changed

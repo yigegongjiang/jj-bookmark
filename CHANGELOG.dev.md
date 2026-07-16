@@ -7,6 +7,11 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.6.0] - 2026-07-16
+
+- 书签列表显示完整网址，仅用红色突出可注册主域名，便于快速定位站点
+  - `BookmarkCellView` 用 attributed string 仅高亮 eTLD+1；`swift-psl` 处理 `co.jp` 等多段公共后缀；打包脚本携带 SwiftPM resource bundle
+
 ## [0.5.0] - 2026-07-16
 
 - 搜索支持空格分隔的多关键词，可分别命中标题、网址、描述、备注、文件夹和标签

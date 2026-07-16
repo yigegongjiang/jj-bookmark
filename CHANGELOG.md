@@ -11,6 +11,13 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.2.0] - 2026-07-16
+
+### Added
+
+- 偏好设置窗口（⌘,）：集中管理自动退出、命令行工具安装 / 重装、检查更新
+- 闲置自动退出：打开链接后忘记关闭时到点自动退出；默认 1 分钟，可选 1 / 5 / 10 / 自定义
+
 ## [0.1.2] - 2026-07-16
 
 跟随版本同步发布
@@ -29,6 +36,7 @@
 - App 三栏浏览 + 文件夹树 + 即时搜索；终端改动后无需重启即刷新
 - 查询：内嵌 jq 引擎的 `--filter`，数据文件也可直接用 `jq` 处理
 
+[0.2.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.2.0
 [0.1.2]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.1.2
 [0.1.1]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.1.1
 [0.1.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.1.0

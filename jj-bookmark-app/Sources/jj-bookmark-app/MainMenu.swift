@@ -44,6 +44,12 @@ enum MainMenu {
         menu.addItem(withTitle: "关于 \(appName)",
                      action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         menu.addItem(.separator())
+        // target=AppDelegate（在响应链上）；标准 ⌘, 打开偏好设置。
+        let settings = NSMenuItem(title: "偏好设置…",
+                                  action: #selector(AppDelegate.showSettings(_:)), keyEquivalent: ",")
+        settings.target = NSApp.delegate
+        menu.addItem(settings)
+        menu.addItem(.separator())
         menu.addItem(withTitle: "隐藏 \(appName)",
                      action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = NSMenuItem(title: "隐藏其他",

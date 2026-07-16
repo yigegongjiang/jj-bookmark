@@ -5,7 +5,7 @@ import Foundation
 // 仅版本不一致才提示覆盖，绝不静默覆盖用户可能更新的副本。
 @MainActor
 enum CLIInstaller {
-    private static let target = FileManager.default.homeDirectoryForCurrentUser
+    static let target = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".local/bin/jj-bookmark")
 
     static func installIfNeeded(runner: CLIRunner) {
@@ -35,7 +35,25 @@ enum CLIInstaller {
         }
     }
 
-    private static func installedVersion() -> String? {
+    // Settings「安装 / 重装」入口：无条件覆盖，弹结果。返回是否成功。
+    @discardableResult
+    static func reinstall(runner: CLIRunner) -> Bool {
+        let ok = copyCLI(from: runner.executableURL)
+        let alert = NSAlert()
+        if ok {
+            alert.messageText = "命令行工具已安装"
+            alert.informativeText = "jj-bookmark 已复制到 \(target.path)\n请确保 ~/.local/bin 在 PATH 中。"
+        } else {
+            alert.messageText = "安装失败"
+            alert.informativeText = "无法写入 \(target.path)，详见 Console 日志。"
+            alert.alertStyle = .warning
+        }
+        alert.runModal()
+        return ok
+    }
+
+    // 已安装 CLI 版本（供 Settings 显示）；未安装返回 nil。
+    static func installedVersion() -> String? {
         let p = Process()
         p.executableURL = target
         p.arguments = ["--version"]
@@ -51,15 +69,18 @@ enum CLIInstaller {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
     }
 
-    private static func copyCLI(from src: URL) {
+    @discardableResult
+    private static func copyCLI(from src: URL) -> Bool {
         let fm = FileManager.default
         do {
             try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
             if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
             try fm.copyItem(at: src, to: target)
             try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: target.path)
+            return true
         } catch {
             NSLog("jj-bookmark: 安装 CLI 失败: \(error)")
+            return false
         }
     }
 

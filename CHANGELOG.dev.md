@@ -7,6 +7,13 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.2.0] - 2026-07-16
+
+- 偏好设置窗口（⌘,）：集中管理自动退出、命令行工具安装 / 重装、检查更新
+  - 纯代码 `SettingsWindowController`(NSStackView)；AppDelegate 强持有(否则窗口即释放)；菜单项 target=NSApp.delegate 走响应链；`CLIInstaller` 暴露 `reinstall`/`installedVersion`；更新=打开 Releases 页
+- 闲置自动退出：打开链接后忘记关闭时到点自动退出；默认 1 分钟，可选 1 / 5 / 10 / 自定义
+  - `AutoExitManager` idle-timer 启动即 arm；local 事件监听重置；`beginActivity(.userInitiatedAllowingIdleSystemSleep)` 防 App Nap 后台节流；`.common` runloop；模态/sheet 时推迟；env `JJ_BOOKMARK_AUTOEXIT_SECONDS` 便于测试
+
 ## [0.1.2] - 2026-07-16
 
 - 跟随版本同步发布
@@ -30,6 +37,7 @@
 - 查询：内嵌 jq 引擎的 `--filter`，数据文件也可直接用 `jq` 处理
   - `jaq`(纯 Rust,in-process)驱动 `--filter`；关键词模糊搜与四键排序走原生比较
 
+[0.2.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.2.0
 [0.1.2]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.1.2
 [0.1.1]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.1.1
 [0.1.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.1.0

@@ -45,17 +45,25 @@ pub fn sort_bookmarks(bms: &mut [Bookmark], key: SortKey, order: Order) {
     });
 }
 
-/// 关键词模糊搜：大小写不敏感，匹配 title / url / excerpt 任一。
+/// 多关键词搜索：按 Unicode 空白分词；每词大小写不敏感；全部词均须命中任意可搜索字段。
 pub fn keyword_filter(bms: Vec<Bookmark>, keyword: &str) -> Vec<Bookmark> {
-    let q = keyword.trim().to_lowercase();
-    if q.is_empty() {
+    let terms: Vec<String> = keyword.split_whitespace().map(str::to_lowercase).collect();
+    if terms.is_empty() {
         return bms;
     }
     bms.into_iter()
         .filter(|b| {
-            format!("{} {} {}", b.title, b.url, b.excerpt)
-                .to_lowercase()
-                .contains(&q)
+            let searchable = format!(
+                "{} {} {} {} {} {}",
+                b.title,
+                b.url,
+                b.excerpt,
+                b.note,
+                b.folder,
+                b.tags.join(" ")
+            )
+            .to_lowercase();
+            terms.iter().all(|term| searchable.contains(term))
         })
         .collect()
 }
@@ -109,6 +117,29 @@ mod tests {
         let out = keyword_filter(vec![a, b], "markdown");
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].id, 1);
+    }
+
+    #[test]
+    fn keyword_matches_all_whitespace_separated_terms() {
+        let mut matching = bm(1, 0, 0, "Dashboard");
+        matching.url = "https://example.com".into();
+        let missing_term = bm(2, 0, 0, "Dashboard");
+
+        let out = keyword_filter(vec![matching, missing_term], "  dashboard\u{3000}COM  ");
+
+        assert_eq!(out.iter().map(|b| b.id).collect::<Vec<_>>(), vec![1]);
+    }
+
+    #[test]
+    fn keyword_matches_note_folder_and_tags() {
+        let mut matching = bm(1, 0, 0, "Reference");
+        matching.note = "Rust ownership".into();
+        matching.folder = "Work / Backend".into();
+        matching.tags = vec!["language".into()];
+
+        let out = keyword_filter(vec![matching], "rust backend language");
+
+        assert_eq!(out.len(), 1);
     }
 
     #[test]

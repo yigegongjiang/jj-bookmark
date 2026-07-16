@@ -55,7 +55,7 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
-    /// Fuzzy-search title/url/excerpt (sortable); `--filter` takes a native jq filter (run by embedded jaq)
+    /// Search bookmarks by whitespace-separated keywords (sortable); `--filter` takes a native jq filter (run by embedded jaq)
     Query {
         /// Keyword (may be an empty string to match all, used with --filter)
         keyword: String,

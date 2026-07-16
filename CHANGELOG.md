@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.5.0] - 2026-07-16
+
+### Changed
+
+- 搜索支持空格分隔的多关键词，可分别命中标题、网址、描述、备注、文件夹和标签
+
 ## [0.4.3] - 2026-07-16
 
 跟随版本同步发布

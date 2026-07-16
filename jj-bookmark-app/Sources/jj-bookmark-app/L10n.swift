@@ -58,7 +58,7 @@ nonisolated enum L10n {
     // MARK: - 主界面（MainViewController）
 
     static var searchPlaceholder: String {
-        tr("Search title / URL / description", "搜索标题 / 网址 / 描述", "タイトル / URL / 説明を検索")
+        tr("Search bookmarks", "搜索书签", "ブックマークを検索")
     }
     static var toolbarNew: String { tr("＋ New", "＋ 新建", "＋ 新規") }
     static var columnFolder: String { tr("Folder", "文件夹", "フォルダ") }

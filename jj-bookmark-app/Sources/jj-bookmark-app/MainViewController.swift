@@ -234,10 +234,7 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
             list = list.filter { folder.matches($0) }
         }
         if !searchText.isEmpty {
-            let q = searchText.lowercased()
-            list = list.filter {
-                ($0.title + " " + $0.url + " " + $0.excerpt).lowercased().contains(q)
-            }
+            list = list.filter { $0.matchesSearch(searchText) }
         }
         Sorting.sort(&list, key: sortKey, order: sortOrder)
         visible = list

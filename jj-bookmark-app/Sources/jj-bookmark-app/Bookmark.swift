@@ -64,4 +64,14 @@ extension Bookmark {
         guard let host = URLComponents(string: url)?.host else { return url }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
+
+    /// 多关键词搜索：按 Unicode 空白分词；全部词均须命中任意可搜索字段。
+    func matchesSearch(_ query: String) -> Bool {
+        let terms = query.split(whereSeparator: { $0.isWhitespace }).map { $0.lowercased() }
+        if terms.isEmpty { return true }
+        let searchable = [title, url, excerpt, note, folder, tags.joined(separator: " ")]
+            .joined(separator: " ")
+            .lowercased()
+        return terms.allSatisfy { searchable.contains($0) }
+    }
 }

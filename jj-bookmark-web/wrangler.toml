@@ -1,6 +1,7 @@
 # Cloudflare Worker：只读 preview page + /api/bookmarks（读 R2）。
-# 认证由 Cloudflare Access（Google IdP）在边缘网关，Worker 自身不做鉴权（见 README）。
-name = "jj-bookmark-web"
+# 认证：Cloudflare Access（Google IdP）边缘网关 + Worker 校验 Access JWT（见 README / src/index.js）。
+# Worker 名 = jj-bookmark（与目录名 jj-bookmark-web 不同，对齐 Access 应用所配域名）。
+name = "jj-bookmark"
 main = "src/index.js"
 compatibility_date = "2026-07-17"
 

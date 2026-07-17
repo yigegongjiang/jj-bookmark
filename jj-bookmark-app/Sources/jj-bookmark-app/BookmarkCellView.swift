@@ -1,7 +1,7 @@
 import AppKit
 import PublicSuffixList
 
-// 书签列表单元格：标题（主）+ 「完整 URL · folder · 日期」（次）两行；仅可注册主域名醒目显示。
+// 书签列表单元格：标题（主）+ 「完整 URL · source · folder · 日期」（次）两行。
 final class BookmarkCellView: NSTableCellView {
     static let reuseID = NSUserInterfaceItemIdentifier("BookmarkCell")
 
@@ -43,7 +43,7 @@ final class BookmarkCellView: NSTableCellView {
     func configure(with b: Bookmark) {
         titleLabel.stringValue = b.title.isEmpty ? b.url : b.title
         url = b.url
-        var parts: [String] = []
+        var parts = [b.source]
         if !b.folder.isEmpty { parts.append(b.folder) }
         let date = String(b.createdJst.prefix(10)) // YYYY-MM-DD
         if !date.isEmpty { parts.append(date) }

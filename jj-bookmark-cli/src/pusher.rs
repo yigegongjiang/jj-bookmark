@@ -56,7 +56,7 @@ pub fn build_put_args(base: &[String], bucket: &str, key: &str, file: &str) -> V
 /// 校验并上传本地数据文件到固定 R2 目标（`BUCKET`/`KEY`）。wrangler 的 stdout/stderr 直接透传。
 pub fn push(paths: &Paths) -> Result<()> {
     if !paths.data.exists() {
-        bail!("no data file to push yet: {} (add a bookmark first)", paths.data.display());
+        bail!("no data file to push yet: {} (apply a URL first)", paths.data.display());
     }
     read_store(paths)?; // 上传前解析校验：损坏文件不推上去（保留原错误信息）
     let file = paths.data.to_str().context("data file path is not valid UTF-8")?;

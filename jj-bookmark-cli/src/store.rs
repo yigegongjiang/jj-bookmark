@@ -27,7 +27,9 @@ impl Paths {
     /// 测试隔离直接用 [`Paths::from_dir`] 构造，无需 env 钩子。
     pub fn resolve() -> Result<Paths> {
         let home = std::env::var_os("HOME").context("environment variable HOME is not set")?;
-        Ok(Paths::from_dir(PathBuf::from(home).join(".config").join("jj-bookmark")))
+        Ok(Paths::from_dir(
+            PathBuf::from(home).join(".config").join("jj-bookmark"),
+        ))
     }
 
     pub fn from_dir(dir: PathBuf) -> Paths {
@@ -103,7 +105,8 @@ fn write_atomic(paths: &Paths, store: &Store) -> Result<()> {
 }
 
 fn fsync_dir(dir: &Path) -> Result<()> {
-    let f = File::open(dir).with_context(|| format!("failed to open directory: {}", dir.display()))?;
+    let f =
+        File::open(dir).with_context(|| format!("failed to open directory: {}", dir.display()))?;
     f.sync_all().context("failed to fsync directory")?;
     Ok(())
 }
@@ -154,7 +157,7 @@ mod tests {
         let p = temp_paths("missing");
         let s = read_store(&p).unwrap();
         assert_eq!(s.version, CURRENT_VERSION);
-        assert!(s.bookmarks.is_empty());
+        assert!(s.sources.is_empty());
         let _ = fs::remove_dir_all(&p.dir);
     }
 
@@ -162,23 +165,28 @@ mod tests {
     fn write_then_read_roundtrip() {
         let p = temp_paths("roundtrip");
         mutate(&p, |store| {
-            store.bookmarks.push(Bookmark::new(
-                1,
-                "https://example.com".into(),
-                "示例".into(),
-                "Tools".into(),
-                "".into(),
-            ));
+            store
+                .sources
+                .entry("default".into())
+                .or_default()
+                .push(Bookmark::new(
+                    1,
+                    "https://example.com".into(),
+                    "示例".into(),
+                    "Tools".into(),
+                    "".into(),
+                ));
             Ok(())
         })
         .unwrap();
 
         let s = read_store(&p).unwrap();
-        assert_eq!(s.bookmarks.len(), 1);
-        assert_eq!(s.bookmarks[0].title, "示例");
+        assert_eq!(s.total_len(), 1);
+        let bookmark = &s.sources["default"][0];
+        assert_eq!(bookmark.title, "示例");
         // 派生字段已生成
-        assert!(!s.bookmarks[0].created_jst.is_empty());
-        assert_eq!(s.bookmarks[0].last_visited_jst, "");
+        assert!(!bookmark.created_jst.is_empty());
+        assert_eq!(bookmark.last_visited_jst, "");
         // 文件是 pretty JSON 且中文不转义
         let raw = fs::read_to_string(&p.data).unwrap();
         assert!(raw.contains("  \"title\": \"示例\""));
@@ -190,24 +198,51 @@ mod tests {
         // 模拟：mutate 期间数据文件已被「外部」改动，重读应看到它，不覆盖丢失。
         let p = temp_paths("reread");
         mutate(&p, |s| {
-            s.bookmarks.push(Bookmark::new(1, "u1".into(), "a".into(), "".into(), "".into()));
+            s.sources
+                .entry("default".into())
+                .or_default()
+                .push(Bookmark::new(
+                    1,
+                    "u1".into(),
+                    "a".into(),
+                    "".into(),
+                    "".into(),
+                ));
             Ok(())
         })
         .unwrap();
         // 直接在磁盘上再加一条（绕过 mutate，模拟另一进程已提交）
         let mut disk = read_store(&p).unwrap();
-        disk.bookmarks.push(Bookmark::new(2, "u2".into(), "b".into(), "".into(), "".into()));
+        disk.sources
+            .entry("default".into())
+            .or_default()
+            .push(Bookmark::new(
+                2,
+                "u2".into(),
+                "b".into(),
+                "".into(),
+                "".into(),
+            ));
         disk.normalize();
         write_atomic(&p, &disk).unwrap();
         // 再 mutate 加第三条：因锁内重读，应基于「磁盘上两条」之上追加
         mutate(&p, |s| {
-            assert_eq!(s.bookmarks.len(), 2, "mutate 必须重读到磁盘最新状态");
-            s.bookmarks.push(Bookmark::new(3, "u3".into(), "c".into(), "".into(), "".into()));
+            assert_eq!(s.total_len(), 2, "mutate 必须重读到磁盘最新状态");
+            s.sources
+                .entry("default".into())
+                .or_default()
+                .push(Bookmark::new(
+                    3,
+                    "u3".into(),
+                    "c".into(),
+                    "".into(),
+                    "".into(),
+                ));
             Ok(())
         })
         .unwrap();
         let s = read_store(&p).unwrap();
-        assert_eq!(s.bookmarks.len(), 3);
+        assert_eq!(s.total_len(), 3);
         let _ = fs::remove_dir_all(&p.dir);
     }
 }

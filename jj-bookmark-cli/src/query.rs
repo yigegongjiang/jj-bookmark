@@ -54,8 +54,7 @@ pub fn keyword_filter(bms: Vec<Bookmark>, keyword: &str) -> Vec<Bookmark> {
     bms.into_iter()
         .filter(|b| {
             let searchable = format!(
-                "{} {} {} {} {} {} {}",
-                b.source,
+                "{} {} {} {} {} {}",
                 b.title,
                 b.url,
                 b.excerpt,

@@ -1,7 +1,7 @@
 import AppKit
 
 // 三栏主界面：左 folder 树（NSOutlineView）+ 右书签列表（NSTableView）+ 顶部搜索/排序。
-// 数据经内嵌 CLI 加载（ls --json），即时搜索/排序在内存原生做；FSEvents 变更自动刷新。
+// 数据经内嵌 CLI 全量加载，即时搜索/排序在内存原生做；FSEvents 变更自动刷新。
 final class MainViewController: NSViewController, NSMenuItemValidation {
     private let runner: CLIRunner
     private var watcher: FSWatcher?
@@ -31,10 +31,13 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
 
     // 分栏尺寸约束（左侧 folder 栏固定宽 + 两栏各自最小宽，防被拖成 0）
     private static let sidebarWidthKey = "JJBookmark.sidebarWidth"
+    private static let sidebarExpandedItemsKey = "JJBookmark.sidebarExpandedItems"
+    private static let sidebarSelectedItemKey = "JJBookmark.sidebarSelectedItem"
     private let defaultSidebarWidth: CGFloat = 200
     private let sidebarMinWidth: CGFloat = 160
     private let contentMinWidth: CGFloat = 360
     private var didSetInitialSplitPosition = false
+    private var didLoadSidebarState = false
 
     init(runner: CLIRunner) {
         self.runner = runner
@@ -210,8 +213,12 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
     // MARK: - 加载 / 刷新
 
     private func reload() {
-        let snapshot = captureExpansion()
-        let prevFolder = selectedFolder.map { ($0.kind, $0.path) }
+        let defaults = UserDefaults.standard
+        let snapshot = didLoadSidebarState
+            ? captureExpansion()
+            : Set(defaults.stringArray(forKey: Self.sidebarExpandedItemsKey) ?? [])
+        let prevFolder = selectedFolder?.stateKey
+            ?? defaults.string(forKey: Self.sidebarSelectedItemKey)
         do {
             allBookmarks = try runner.loadAll()
         } catch {
@@ -225,6 +232,8 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
         restoreExpansion(snapshot)
         restoreFolderSelection(prevFolder)
         isRestoring = false
+        didLoadSidebarState = true
+        saveSidebarState()
 
         recomputeVisible()
     }
@@ -288,30 +297,40 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
     }
 
     private func captureExpansion() -> Set<String> {
-        var paths = Set<String>()
+        var keys = Set<String>()
         func walk(_ nodes: [FolderNode]) {
-            for n in nodes where n.kind == .normal {
-                if outlineView.isItemExpanded(n) { paths.insert(n.path) }
+            for n in nodes {
+                if !n.children.isEmpty, outlineView.isItemExpanded(n) { keys.insert(n.stateKey) }
                 walk(n.children)
             }
         }
         walk(folderRoots)
-        return paths
+        return keys
     }
 
-    private func restoreExpansion(_ paths: Set<String>) {
+    private func restoreExpansion(_ keys: Set<String>) {
         func walk(_ nodes: [FolderNode]) {
-            for n in nodes where n.kind == .normal {
-                if paths.contains(n.path) { outlineView.expandItem(n) }
+            for n in nodes {
+                if keys.contains(n.stateKey) { outlineView.expandItem(n) }
                 walk(n.children)
             }
         }
         walk(folderRoots)
     }
 
-    private func restoreFolderSelection(_ prev: (FolderNode.Kind, String)?) {
+    private func saveSidebarState() {
+        let defaults = UserDefaults.standard
+        defaults.set(captureExpansion().sorted(), forKey: Self.sidebarExpandedItemsKey)
+        if let key = selectedFolder?.stateKey {
+            defaults.set(key, forKey: Self.sidebarSelectedItemKey)
+        } else {
+            defaults.removeObject(forKey: Self.sidebarSelectedItemKey)
+        }
+    }
+
+    private func restoreFolderSelection(_ previousKey: String?) {
         let target: FolderNode?
-        if let prev, let found = findFolder(kind: prev.0, path: prev.1) {
+        if let previousKey, let found = findFolder(stateKey: previousKey) {
             target = found
         } else {
             target = folderRoots.first // 默认「全部」（或之前的 folder 已不存在）
@@ -325,10 +344,10 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
         }
     }
 
-    private func findFolder(kind: FolderNode.Kind, path: String) -> FolderNode? {
+    private func findFolder(stateKey: String) -> FolderNode? {
         func search(_ nodes: [FolderNode]) -> FolderNode? {
             for n in nodes {
-                if n.kind == kind, n.path == path { return n }
+                if n.stateKey == stateKey { return n }
                 if let f = search(n.children) { return f }
             }
             return nil
@@ -389,6 +408,7 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
 
     @objc func newBookmark() {
         let folderDefault = selectedFolder?.kind == .normal ? (selectedFolder?.path ?? "") : ""
+        let source = selectedFolder?.source ?? "default"
         guard let v = runForm(title: L10n.formNewTitle, okTitle: L10n.btnAdd, fields: [
             ("URL", "", "https://…"),
             (L10n.fieldTitle, "", L10n.placeholderTitleHint),
@@ -397,7 +417,13 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
         let url = v[0].trimmingCharacters(in: .whitespacesAndNewlines)
         guard !url.isEmpty else { return }
         performWrite {
-            let newID = try runner.add(url: url, title: v[1], folder: v[2], note: nil)
+            let newID = try runner.add(
+                source: source,
+                url: url,
+                title: v[1],
+                folder: v[2],
+                note: nil
+            )
             if let id = newID { backgroundFetch(id: id) } // 后台补全元数据，完成后 FSEvents 自刷新
         }
     }
@@ -454,13 +480,13 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
     }
 
     @objc private func renameSelectedFolder() {
-        guard let node = clickedFolder(), node.kind == .normal else { return }
+        guard let node = clickedFolder(), node.kind == .normal, let source = node.source else { return }
         guard let v = runForm(title: L10n.formRenameTitle, okTitle: L10n.btnRename, fields: [
             (L10n.fieldNewPath, node.path, "A / B"),
         ]) else { return }
         let newPath = v[0].trimmingCharacters(in: .whitespacesAndNewlines)
         guard !newPath.isEmpty, newPath != node.path else { return }
-        performWrite { try runner.moveFolder(from: node.path, to: newPath) }
+        performWrite { try runner.moveFolder(source: source, from: node.path, to: newPath) }
     }
 
     /// 运行 CLI 写操作 → 成功即刷新；失败弹错。
@@ -610,6 +636,9 @@ extension MainViewController: NSOutlineViewDataSource, NSOutlineViewDelegate {
                 return c
             }()
         cell.textField?.stringValue = "\(node.name)  (\(node.count))"
+        cell.textField?.font = node.kind == .source
+            ? .systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
+            : .systemFont(ofSize: NSFont.systemFontSize)
         return cell
     }
 
@@ -617,7 +646,16 @@ extension MainViewController: NSOutlineViewDataSource, NSOutlineViewDelegate {
         guard !isRestoring else { return }
         let row = outlineView.selectedRow
         selectedFolder = row >= 0 ? (outlineView.item(atRow: row) as? FolderNode) : nil
+        saveSidebarState()
         recomputeVisible()
+    }
+
+    func outlineViewItemDidExpand(_: Notification) {
+        if !isRestoring { saveSidebarState() }
+    }
+
+    func outlineViewItemDidCollapse(_: Notification) {
+        if !isRestoring { saveSidebarState() }
     }
 }
 

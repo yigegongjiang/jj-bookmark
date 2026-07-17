@@ -1,8 +1,8 @@
 import AppKit
 import Foundation
 
-// 首次启动可把内嵌 CLI 装到 ~/.local/bin，方便终端使用（roadmap Phase 5）。
-// 仅版本不一致才提示覆盖，绝不静默覆盖用户可能更新的副本。
+// 首次启动可把 ~/.local/bin/jj-bookmark 链接到 App 内嵌 CLI，方便终端使用。
+// 旧复制文件 / 失效链接只提示替换，绝不静默覆盖。
 @MainActor
 enum CLIInstaller {
     static let target = FileManager.default.homeDirectoryForCurrentUser
@@ -15,28 +15,32 @@ enum CLIInstaller {
         guard !bundleVersion.isEmpty else { return } // 非 .app 运行
 
         let fm = FileManager.default
-        if !fm.fileExists(atPath: target.path) {
+        if !targetExists(using: fm) {
             // 未安装：首启询问一次（记住已问，避免每次弹）。
             guard !UserDefaults.standard.bool(forKey: "cliInstallOffered") else { return }
             UserDefaults.standard.set(true, forKey: "cliInstallOffered")
             if confirm(title: L10n.installTitle, okTitle: L10n.btnInstall, text: L10n.installText) {
-                copyCLI(from: runner.executableURL)
+                linkCLI(to: runner.executableURL)
             }
             return
         }
 
-        // 已安装：仅当版本不一致才询问更新。
-        guard let installed = installedVersion(), installed != bundleVersion else { return }
+        // 已安装：版本不一致或仍是旧复制文件时，询问改为指向当前 App 的链接。
+        let installed = installedVersion()
+        guard installed != bundleVersion || !isCurrentLink(to: runner.executableURL, using: fm) else {
+            return
+        }
         if confirm(title: L10n.updateTitle, okTitle: L10n.btnUpdate,
-                   text: L10n.updateText(installed: installed, bundle: bundleVersion)) {
-            copyCLI(from: runner.executableURL)
+                   text: L10n.updateText(installed: installed ?? L10n.valueUnknown,
+                                         bundle: bundleVersion)) {
+            linkCLI(to: runner.executableURL)
         }
     }
 
     // Settings「安装 / 重装」入口：无条件覆盖，弹结果。返回是否成功。
     @discardableResult
     static func reinstall(runner: CLIRunner) -> Bool {
-        let ok = copyCLI(from: runner.executableURL)
+        let ok = linkCLI(to: runner.executableURL)
         let alert = NSAlert()
         if ok {
             alert.messageText = L10n.installedTitle
@@ -68,18 +72,26 @@ enum CLIInstaller {
     }
 
     @discardableResult
-    private static func copyCLI(from src: URL) -> Bool {
+    private static func linkCLI(to source: URL) -> Bool {
         let fm = FileManager.default
         do {
             try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-            if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
-            try fm.copyItem(at: src, to: target)
-            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: target.path)
+            if targetExists(using: fm) { try fm.removeItem(at: target) }
+            try fm.createSymbolicLink(atPath: target.path, withDestinationPath: source.path)
             return true
         } catch {
             NSLog("jj-bookmark: 安装 CLI 失败: \(error)")
             return false
         }
+    }
+
+    private static func targetExists(using fm: FileManager) -> Bool {
+        fm.fileExists(atPath: target.path)
+            || (try? fm.destinationOfSymbolicLink(atPath: target.path)) != nil
+    }
+
+    private static func isCurrentLink(to source: URL, using fm: FileManager) -> Bool {
+        (try? fm.destinationOfSymbolicLink(atPath: target.path)) == source.path
     }
 
     private static func confirm(title: String, okTitle: String, text: String) -> Bool {

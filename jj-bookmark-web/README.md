@@ -22,7 +22,7 @@
 
 ```bash
 npm install                                                   # 装 wrangler
-echo '{"version":1,"bookmarks":[]}' > /tmp/seed.json
+echo '{"version":3,"sources":{}}' > /tmp/seed.json
 npx wrangler r2 object put jj-bookmark/bookmarks.json --file /tmp/seed.json --local  # 塞本地模拟 R2
 npm run dev                                                   # 本地起 Worker（默认 http://localhost:8787）
 ```

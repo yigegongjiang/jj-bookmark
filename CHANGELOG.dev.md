@@ -7,6 +7,19 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.12.0] - 2026-07-17
+
+- CLI 用 `apply <URL|ID>` 统一新增 / 编辑，`apply <ID> --delete` 删除；`--source` / `--all` 仅为根选项
+  - clap root flatten scope，不向子命令传播参数；`apply` 按 URL / ID 分派并以 Added / Updated / Deleted 返回值区分结果
+- source 改为数据与 App / 网页侧栏的第一层分组，不再在每条书签内重复保存
+  - schema v3 = `{version,sources:{name:[bookmark]}}`，兼容读取 v1/v2；App / Web 解码后注入 source 供侧栏与搜索使用
+- App 安装 CLI 改为符号链接，随 App 更新自动使用同版本内嵌 CLI
+  - `CLIInstaller` 用 `createSymbolicLink` 替代复制；识别旧文件 / 失效链接并提示替换，Settings 重装直接重建链接
+- App 重启后保持侧栏 source / folder 的展开状态与选中路径
+  - `UserDefaults` 持久化 `FolderNode.stateKey` 集合与当前选择；展开 / 折叠 / 选择时即时写入，加载时恢复并清理失效路径
+- 删除 `add` / `edit` / `rm` / `help` 子命令；帮助仅使用 `-h` / `--help`
+  - App 全部写操作改走 `apply`；clap 禁用 help subcommand
+
 ## [0.11.0] - 2026-07-17
 
 - 书签支持 source 分组：CLI 默认仅操作 `default`，可用 `--source <NAME>` / `--all` 切换，`sources` 查看统计

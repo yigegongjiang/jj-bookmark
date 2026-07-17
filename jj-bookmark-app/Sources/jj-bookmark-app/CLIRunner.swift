@@ -69,18 +69,18 @@ nonisolated struct CLIRunner: Sendable {
         return outBox.data
     }
 
-    /// 加载全量书签（`ls --all --json`）。CLI 保证 --json 失败以非零码报错，不吐半截 JSON。
+    /// 加载全量书签（`--all ls --json`）。CLI 保证 --json 失败以非零码报错，不吐半截 JSON。
     func loadAll() throws -> [Bookmark] {
-        let data = try run(["ls", "--all", "--json"])
+        let data = try run(["--all", "ls", "--json"])
         return try JSONDecoder().decode(BookmarkStore.self, from: data).bookmarks
     }
 
     // MARK: - 写操作（全部经 CLI，App 不复刻锁/原子写）
 
-    /// 新增书签，返回新 id（从 CLI stdout "已添加 #<id>" 解析）。
+    /// 新增书签，返回新 id（从 CLI stdout "Added #<id>" 解析）。
     @discardableResult
-    func add(url: String, title: String?, folder: String?, note: String?) throws -> Int64? {
-        var args = ["add", url]
+    func add(source: String, url: String, title: String?, folder: String?, note: String?) throws -> Int64? {
+        var args = ["--source", source, "apply", url]
         if let t = title, !t.isEmpty { args += ["--title", t] }
         if let f = folder, !f.isEmpty { args += ["--folder", f] }
         if let n = note, !n.isEmpty { args += ["--note", n] }
@@ -92,18 +92,20 @@ nonisolated struct CLIRunner: Sendable {
     }
 
     /// 后台抓取元数据（best-effort，失败忽略）。
-    func fetch(id: Int64) throws { try run(["fetch", String(id), "--all"]) }
+    func fetch(id: Int64) throws { try run(["--all", "fetch", String(id)]) }
 
     func edit(id: Int64, title: String, url: String, excerpt: String, note: String, folder: String) throws {
         // 编辑面板一次提交全部字段（含清空为 ""）。
-        try run(["edit", String(id),
+        try run(["--all", "apply", String(id),
                  "--title", title, "--url", url, "--excerpt", excerpt,
-                 "--note", note, "--folder", folder, "--all"])
+                 "--note", note, "--folder", folder])
     }
 
-    func remove(id: Int64) throws { try run(["rm", String(id), "--all"]) }
+    func remove(id: Int64) throws { try run(["--all", "apply", String(id), "--delete"]) }
 
-    func open(id: Int64) throws { try run(["open", String(id), "--all"]) }
+    func open(id: Int64) throws { try run(["--all", "open", String(id)]) }
 
-    func moveFolder(from old: String, to new: String) throws { try run(["mv", old, new, "--all"]) }
+    func moveFolder(source: String, from old: String, to new: String) throws {
+        try run(["--source", source, "mv", old, new])
+    }
 }

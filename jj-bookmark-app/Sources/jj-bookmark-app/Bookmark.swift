@@ -54,10 +54,30 @@ extension Bookmark: Decodable {
     }
 }
 
-// CLI `--json` 顶层契约 { version, bookmarks }（data-model §11）。
-nonisolated struct BookmarkStore: Decodable, Sendable {
+// CLI `--json` 顶层契约 { version, sources: { name: [...] } }；source 注入内存模型。
+nonisolated struct BookmarkStore: Sendable {
     var version: Int
     var bookmarks: [Bookmark]
+}
+
+nonisolated extension BookmarkStore: Decodable {
+    enum CodingKeys: String, CodingKey { case version, sources, bookmarks }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 0
+        if let grouped = try container.decodeIfPresent([String: [Bookmark]].self, forKey: .sources) {
+            bookmarks = grouped.keys.sorted().flatMap { source in
+                grouped[source, default: []].map { bookmark in
+                    var bookmark = bookmark
+                    bookmark.source = source
+                    return bookmark
+                }
+            }
+        } else {
+            bookmarks = try container.decodeIfPresent([Bookmark].self, forKey: .bookmarks) ?? []
+        }
+    }
 }
 
 extension Bookmark {

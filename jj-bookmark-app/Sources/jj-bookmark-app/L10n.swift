@@ -173,26 +173,26 @@ nonisolated enum L10n {
     }
     static var btnInstall: String { tr("Install", "安装", "インストール") }
     static var installText: String {
-        tr("Install jj-bookmark to ~/.local/bin for terminal use (make sure that directory is in your PATH).",
-           "将 jj-bookmark 安装到 ~/.local/bin，便于终端使用（请确保该目录在 PATH 中）。",
-           "ターミナルで使えるよう jj-bookmark を ~/.local/bin にインストールします（そのディレクトリが PATH に含まれていることを確認してください）。")
+        tr("Link jj-bookmark in ~/.local/bin to the app for terminal use (make sure that directory is in your PATH).",
+           "在 ~/.local/bin 创建指向 App 内嵌 jj-bookmark 的链接（请确保该目录在 PATH 中）。",
+           "~/.local/bin にアプリ内蔵 jj-bookmark へのリンクを作成します（そのディレクトリが PATH に含まれていることを確認してください）。")
     }
     static var updateTitle: String {
         tr("Update command-line tool?", "更新命令行工具？", "コマンドラインツールを更新しますか？")
     }
     static var btnUpdate: String { tr("Update", "更新", "更新") }
     static func updateText(installed: String, bundle: String) -> String {
-        tr("jj-bookmark in ~/.local/bin is \(installed), the app bundle is \(bundle). Update it?",
-           "~/.local/bin 中的 jj-bookmark 为 \(installed)，App 内嵌为 \(bundle)。是否更新？",
-           "~/.local/bin の jj-bookmark は \(installed)、アプリ内蔵は \(bundle) です。更新しますか？")
+        tr("jj-bookmark in ~/.local/bin is \(installed), the app bundle is \(bundle). Replace it with a link to the app?",
+           "~/.local/bin 中的 jj-bookmark 为 \(installed)，App 内嵌为 \(bundle)。是否替换为指向 App 的链接？",
+           "~/.local/bin の jj-bookmark は \(installed)、アプリ内蔵は \(bundle) です。アプリへのリンクに置き換えますか？")
     }
     static var installedTitle: String {
         tr("Command-line tool installed", "命令行工具已安装", "コマンドラインツールをインストールしました")
     }
     static func installedText(_ path: String) -> String {
-        tr("jj-bookmark has been copied to \(path)\nMake sure ~/.local/bin is in your PATH.",
-           "jj-bookmark 已复制到 \(path)\n请确保 ~/.local/bin 在 PATH 中。",
-           "jj-bookmark を \(path) にコピーしました\n~/.local/bin が PATH に含まれていることを確認してください。")
+        tr("Linked \(path) to the app's embedded jj-bookmark.\nMake sure ~/.local/bin is in your PATH.",
+           "已将 \(path) 链接到 App 内嵌 jj-bookmark。\n请确保 ~/.local/bin 在 PATH 中。",
+           "\(path) をアプリ内蔵 jj-bookmark にリンクしました。\n~/.local/bin が PATH に含まれていることを確認してください。")
     }
     static var installFailedTitle: String {
         tr("Installation failed", "安装失败", "インストールに失敗しました")

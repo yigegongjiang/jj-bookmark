@@ -1,44 +1,40 @@
-//! 输出渲染：`--json`（第二集成契约 §11）与人类可读列表。
+//! grouped JSON 与人类可读输出。
 
 use crate::model::Bookmark;
 use anyhow::{Context, Result};
 use serde::Serialize;
+use std::collections::BTreeMap;
 
-/// `--json` 输出：顶层 `{version, bookmarks}`，字段同文件格式，UTF-8 不转义，pretty。
-/// 失败向上返回错误（由 main 以非零码 + stderr 报告），绝不吐半截 JSON。
-pub fn print_json(bms: &[Bookmark], version: u32) -> Result<()> {
+pub fn print_json(sources: &BTreeMap<String, Vec<Bookmark>>, version: u32) -> Result<()> {
     #[derive(Serialize)]
     struct Out<'a> {
         version: u32,
-        bookmarks: &'a [Bookmark],
+        sources: &'a BTreeMap<String, Vec<Bookmark>>,
     }
-    let s = serde_json::to_string_pretty(&Out {
-        version,
-        bookmarks: bms,
-    })
-    .context("failed to serialize --json output")?;
-    println!("{s}");
+    let json = serde_json::to_string_pretty(&Out { version, sources })
+        .context("failed to serialize --json output")?;
+    println!("{json}");
     Ok(())
 }
 
-/// 人类可读列表（stdout 内容行 + stderr 计数），供终端浏览；App/脚本请用 `--json`。
-pub fn print_human(bms: &[Bookmark], show_source: bool) {
-    for b in bms {
-        let folder = if b.folder.is_empty() {
-            "Uncategorized"
-        } else {
-            &b.folder
-        };
-        println!("{}  {}", b.id, b.title);
-        if show_source {
+pub fn print_human(sources: &BTreeMap<String, Vec<Bookmark>>, show_groups: bool) {
+    for (source, bookmarks) in sources {
+        if show_groups && !bookmarks.is_empty() {
+            println!("[{source}]");
+        }
+        for bookmark in bookmarks {
+            let folder = if bookmark.folder.is_empty() {
+                "Uncategorized"
+            } else {
+                &bookmark.folder
+            };
+            println!("{}  {}", bookmark.id, bookmark.title);
             println!(
-                "      {}  ·  {}  ·  {}  ·  {}",
-                b.source, folder, b.created_jst, b.url
+                "      {}  ·  {}  ·  {}",
+                folder, bookmark.created_jst, bookmark.url
             );
-        } else {
-            println!("      {}  ·  {}  ·  {}", folder, b.created_jst, b.url);
         }
     }
-    let n = bms.len();
-    eprintln!("({n} {})", if n == 1 { "item" } else { "items" });
+    let count: usize = sources.values().map(Vec::len).sum();
+    eprintln!("({count} {})", if count == 1 { "item" } else { "items" });
 }

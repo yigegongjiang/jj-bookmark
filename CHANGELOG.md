@@ -11,6 +11,19 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.12.0] - 2026-07-17
+
+### Changed
+
+- CLI 用 `apply <URL|ID>` 统一新增 / 编辑，`apply <ID> --delete` 删除；`--source` / `--all` 仅为根选项
+- source 改为数据与 App / 网页侧栏的第一层分组，不再在每条书签内重复保存
+- App 安装 CLI 改为符号链接，随 App 更新自动使用同版本内嵌 CLI
+- App 重启后保持侧栏 source / folder 的展开状态与选中路径
+
+### Removed
+
+- 删除 `add` / `edit` / `rm` / `help` 子命令；帮助仅使用 `-h` / `--help`
+
 ## [0.11.0] - 2026-07-17
 
 ### Added

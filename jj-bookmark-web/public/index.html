@@ -99,6 +99,7 @@
       .ftwisty { width: 14px; flex: 0 0 14px; text-align: center; color: var(--fg-2); font-size: 10px; }
       .fnode.sel .ftwisty { color: var(--sel-fg); }
       .fname { overflow: hidden; text-overflow: ellipsis; }
+      .fnode.source .fname { font-weight: 600; }
       .fcount { margin-left: 6px; color: var(--fg-2); font-size: 11px; }
 
       /* 书签行 */
@@ -147,7 +148,8 @@
     <script>
       // ---- 状态 ----
       let ALL = [];
-      let selectedFolder = null; // null = All；"" = Uncategorized；否则 folder 路径
+      let selectedSource = null; // null = 全部 source
+      let selectedFolder = null; // null = source 本身；"" = Uncategorized；否则 folder 路径
       let query = "";
       let sortKey = "created";
       let order = "desc";
@@ -161,7 +163,18 @@
         try {
           const r = await fetch("/api/bookmarks", { cache: "no-store" });
           const data = await r.json();
-          ALL = Array.isArray(data.bookmarks) ? data.bookmarks : [];
+          if (data.sources && typeof data.sources === "object" && !Array.isArray(data.sources)) {
+            ALL = Object.entries(data.sources).flatMap(([source, bookmarks]) =>
+              (Array.isArray(bookmarks) ? bookmarks : []).map((bookmark) => ({ ...bookmark, source }))
+            );
+          } else {
+            ALL = Array.isArray(data.bookmarks)
+              ? data.bookmarks.map((bookmark) => ({
+                  ...bookmark,
+                  source: bookmark.source || "default",
+                }))
+              : [];
+          }
         } catch (e) {
           ALL = [];
         }
@@ -170,9 +183,10 @@
       }
 
       // ---- folder 树构建（扁平 "A / B / C" 路径 → 嵌套） ----
-      function buildTree() {
+      function buildTree(source) {
         const root = { name: "", path: "", children: new Map() };
         for (const b of ALL) {
+          if (b.source !== source) continue;
           const f = (b.folder || "").trim();
           if (!f) continue;
           const parts = f.split(" / ");
@@ -190,48 +204,93 @@
         return root;
       }
 
-      function subtreeCount(path) {
+      function subtreeCount(source, path) {
         const prefix = path + " / ";
         let n = 0;
         for (const b of ALL) {
+          if (b.source !== source) continue;
           const f = b.folder || "";
           if (f === path || f.startsWith(prefix)) n++;
         }
         return n;
       }
 
-      function uncategorizedCount() {
-        return ALL.reduce((n, b) => n + ((b.folder || "") === "" ? 1 : 0), 0);
+      function uncategorizedCount(source) {
+        return ALL.reduce(
+          (n, b) => n + (b.source === source && (b.folder || "") === "" ? 1 : 0),
+          0
+        );
+      }
+
+      function itemKey(source, path) {
+        return `${source}\u0000${path === null ? "@source" : path}`;
+      }
+
+      function isSelected(item) {
+        return selectedSource === item.source && selectedFolder === item.path;
       }
 
       // ---- 侧栏渲染 ----
       function renderSidebar() {
         const side = $("sidebar");
         side.textContent = "";
-        // All
-        side.appendChild(folderRow({ name: "All", path: null }, 0, ALL.length, false, false));
-        // 真实 folder 树
-        const tree = buildTree();
-        const roots = [...tree.children.values()].sort((a, b) => a.name.localeCompare(b.name));
-        for (const n of roots) renderNode(side, n, 1);
-        // Uncategorized（若有）
-        const u = uncategorizedCount();
-        if (u > 0) side.appendChild(folderRow({ name: "Uncategorized", path: "" }, 0, u, false, false));
+        side.appendChild(
+          folderRow({ name: "All", source: null, path: null }, 0, ALL.length, false, false)
+        );
+        const sources = [...new Set(ALL.map((bookmark) => bookmark.source || "default"))]
+          .sort((a, b) => a.localeCompare(b));
+        for (const source of sources) renderSource(side, source);
       }
 
-      function renderNode(container, node, depth) {
+      function renderSource(container, source) {
+        const tree = buildTree(source);
+        const roots = [...tree.children.values()].sort((a, b) => a.name.localeCompare(b.name));
+        const uncategorized = uncategorizedCount(source);
+        const hasChildren = roots.length > 0 || uncategorized > 0;
+        const key = itemKey(source, null);
+        const isCollapsed = collapsed.has(key);
+        const count = ALL.reduce((n, bookmark) => n + (bookmark.source === source ? 1 : 0), 0);
+        container.appendChild(
+          folderRow({ name: source, source, path: null }, 0, count, hasChildren, isCollapsed)
+        );
+        if (isCollapsed) return;
+        for (const node of roots) renderNode(container, node, source, 1);
+        if (uncategorized > 0) {
+          container.appendChild(
+            folderRow(
+              { name: "Uncategorized", source, path: "" },
+              1,
+              uncategorized,
+              false,
+              false
+            )
+          );
+        }
+      }
+
+      function renderNode(container, node, source, depth) {
         const kids = [...node.children.values()].sort((a, b) => a.name.localeCompare(b.name));
         const hasKids = kids.length > 0;
-        const isCollapsed = collapsed.has(node.path);
+        const isCollapsed = collapsed.has(itemKey(source, node.path));
         container.appendChild(
-          folderRow({ name: node.name, path: node.path }, depth, subtreeCount(node.path), hasKids, isCollapsed)
+          folderRow(
+            { name: node.name, source, path: node.path },
+            depth,
+            subtreeCount(source, node.path),
+            hasKids,
+            isCollapsed
+          )
         );
-        if (hasKids && !isCollapsed) for (const k of kids) renderNode(container, k, depth + 1);
+        if (hasKids && !isCollapsed) {
+          for (const child of kids) renderNode(container, child, source, depth + 1);
+        }
       }
 
       function folderRow(item, depth, count, hasKids, isCollapsed) {
         const el = document.createElement("div");
-        el.className = "fnode" + (selectedFolder === item.path ? " sel" : "");
+        el.className = "fnode"
+          + (item.source !== null && item.path === null ? " source" : "")
+          + (isSelected(item) ? " sel" : "");
         el.style.paddingLeft = 8 + depth * 14 + "px";
 
         const tw = document.createElement("span");
@@ -240,8 +299,9 @@
         if (hasKids) {
           tw.addEventListener("click", (e) => {
             e.stopPropagation();
-            if (collapsed.has(item.path)) collapsed.delete(item.path);
-            else collapsed.add(item.path);
+            const key = itemKey(item.source, item.path);
+            if (collapsed.has(key)) collapsed.delete(key);
+            else collapsed.add(key);
             renderSidebar();
           });
         }
@@ -258,6 +318,7 @@
         el.appendChild(c);
 
         el.addEventListener("click", () => {
+          selectedSource = item.source;
           selectedFolder = item.path;
           renderSidebar();
           renderList();
@@ -274,6 +335,9 @@
 
       function visibleBookmarks() {
         let list = ALL;
+        if (selectedSource !== null) {
+          list = list.filter((bookmark) => bookmark.source === selectedSource);
+        }
         if (selectedFolder !== null) {
           if (selectedFolder === "") {
             list = list.filter((b) => (b.folder || "") === "");
@@ -348,6 +412,7 @@
         sub.className = "sub";
         appendUrlWithDomain(sub, b.url || "");
         const meta = [];
+        if (b.source) meta.push(b.source);
         if (b.folder) meta.push(b.folder);
         const date = (b.created_jst || "").slice(0, 10);
         if (date) meta.push(date);

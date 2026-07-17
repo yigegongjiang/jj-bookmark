@@ -7,3 +7,4 @@ jj-bookmark-web/.wrangler/
 
 # macOS
 .DS_Store
+.wrangler/cache/

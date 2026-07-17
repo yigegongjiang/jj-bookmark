@@ -103,4 +103,4 @@ git push origin vX.Y.Z
 - secrets（人类在仓库配置）：`CLOUDFLARE_API_TOKEN`（Workers + R2 权限）、`CLOUDFLARE_ACCOUNT_ID`。
 - 前置（人类在 Cloudflare 侧）：建 R2 bucket `jj-bookmark`；配 Access（Google IdP）网关 Worker 域名。详见 [jj-bookmark-web/README.md](./jj-bookmark-web/README.md)。
 
-> 数据含内网 URL。Worker 在 R2 对象缺失时只返回空库，故未 `push` 前即使裸部署也不泄漏；但 **MUST 先确认 Access 生效，再 `jj-bookmark push` 灌真实数据**。secrets/bucket 未就绪时 deploy GHA 失败即空转，无副作用。
+> 数据含内网 URL。Worker 校验 Access JWT（`wrangler.toml [vars]` 的 team domain/AUD），无有效 token 一律 403（含 `*.workers.dev` 直连）；R2 对象缺失只返回空库。故 deploy 后不裸奔。secrets/bucket 未就绪时 deploy GHA 失败即空转，无副作用。

@@ -12,7 +12,7 @@
 - 新增 `jj-bookmark push`：把本地书签单向同步到网页版，浏览器里随处只读查看
   - `pusher.rs`：经 wrangler `r2 object put <bucket>/<key> --file … --content-type application/json --remote` 上传数据文件到固定 R2（bucket `jj-bookmark`/key `bookmarks.json`，常量、无 env）；wrangler 解析 PATH 有则用、否则 `npx wrangler`；上传前 `read_store` 解析校验，损坏不推
 - 网页版：只读预览页，支持文件夹树、多关键词搜索与排序；经 Google 登录访问
-  - `jj-bookmark-web/`：Cloudflare Worker（`src/index.js`）读 R2 出 `/api/bookmarks`（对象缺失兜底空库），静态 `public/index.html` 单文件 SPA 仿 App 只读浏览（folder 子树过滤 / 多词搜 / created·updated·visited·title 排序 / eTLD+1 域名高亮启发式，非 PSL）；`wrangler.toml` 绑定 R2+Assets；GHA `deploy-web.yml`（push master + `jj-bookmark-web/**` / workflow_dispatch，`cloudflare/wrangler-action`）；认证靠 Cloudflare Access(Google) 边缘网关，Worker 不做 JWT 校验
+  - `jj-bookmark-web/`：Cloudflare Worker（`src/index.js`）读 R2 出 `/api/bookmarks`（对象缺失兜底空库），静态 `public/index.html` 单文件 SPA 仿 App 只读浏览（folder 子树过滤 / 多词搜 / created·updated·visited·title 排序 / eTLD+1 域名高亮启发式，非 PSL）；`wrangler.toml` 绑定 R2+Assets；GHA `deploy-web.yml`（push master + `jj-bookmark-web/**` / workflow_dispatch，`cloudflare/wrangler-action`）；认证双层：Cloudflare Access(Google) 边缘网关 + Worker 校验 `Cf-Access-Jwt-Assertion`（Web Crypto RS256 + iss/aud/exp，`run_worker_first` 令页面与 API 都受控，堵 `*.workers.dev` 直连），team domain/AUD 存 `wrangler.toml [vars]`（非机密），缺则跳过仅靠边缘
   - 移除 CLI 遗留 env 钩子 `JJ_BOOKMARK_DIR`（`Paths::resolve` 固定 `~/.config/jj-bookmark`，测试用 `Paths::from_dir` 直连），承接 0.4.3 去测试门控 env 的方向
 
 ## [0.8.0] - 2026-07-16

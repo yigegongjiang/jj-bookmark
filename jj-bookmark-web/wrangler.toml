@@ -4,14 +4,21 @@ name = "jj-bookmark-web"
 main = "src/index.js"
 compatibility_date = "2026-07-17"
 
-# 静态资源（preview page）。匹配到的路径先于 Worker 返回；未命中才进 fetch。
-# binding=ASSETS 供 Worker 内 env.ASSETS.fetch() 兜底非 /api 路由。
+# 静态资源（preview page）。run_worker_first=true → 所有请求先进 Worker（含静态资源），
+# 由 Worker 统一做 Access JWT 校验后再经 env.ASSETS.fetch() 返回，确保页面也不裸奔。
 [assets]
 directory = "./public"
 binding = "ASSETS"
+run_worker_first = true
 
 # R2 绑定：CLI push 上传的 bookmarks.json 落在此 bucket，Worker 直接读。
 # bucket 需在 Cloudflare 侧预先创建（见 README），否则 deploy 校验失败。
 [[r2_buckets]]
 binding = "BOOKMARKS"
 bucket_name = "jj-bookmark"
+
+# Cloudflare Access（Google 登录）参数——非机密（AUD 是受众标识，非密钥；team domain 公开）。
+# 二者齐备时 Worker 校验 Cf-Access-Jwt-Assertion；缺任一则跳过校验、仅靠边缘 Access。
+[vars]
+CF_ACCESS_TEAM_DOMAIN = "https://yigegongjiang.cloudflareaccess.com"
+CF_ACCESS_AUD = "27e81cfdbe1bade3160d54d81393ee010c331a756c8cb472a68e0b4ab2ffa31f"

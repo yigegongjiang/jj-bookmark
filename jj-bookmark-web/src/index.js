@@ -17,7 +17,7 @@ export default {
       const obj = await env.BOOKMARKS.get(R2_KEY);
       // 首次 push 前对象不存在 → 返回空库，页面渲染空态而非 500
       if (!obj) {
-        return jsonResponse(JSON.stringify({ version: 1, bookmarks: [] }));
+        return jsonResponse(JSON.stringify({ version: 2, bookmarks: [] }));
       }
       return new Response(obj.body, {
         headers: {

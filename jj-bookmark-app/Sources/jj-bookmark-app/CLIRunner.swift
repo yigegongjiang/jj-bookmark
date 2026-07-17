@@ -69,9 +69,9 @@ nonisolated struct CLIRunner: Sendable {
         return outBox.data
     }
 
-    /// 加载全量书签（`ls --json`）。CLI 保证 --json 失败以非零码报错，不吐半截 JSON。
+    /// 加载全量书签（`ls --all --json`）。CLI 保证 --json 失败以非零码报错，不吐半截 JSON。
     func loadAll() throws -> [Bookmark] {
-        let data = try run(["ls", "--json"])
+        let data = try run(["ls", "--all", "--json"])
         return try JSONDecoder().decode(BookmarkStore.self, from: data).bookmarks
     }
 
@@ -92,18 +92,18 @@ nonisolated struct CLIRunner: Sendable {
     }
 
     /// 后台抓取元数据（best-effort，失败忽略）。
-    func fetch(id: Int64) throws { try run(["fetch", String(id)]) }
+    func fetch(id: Int64) throws { try run(["fetch", String(id), "--all"]) }
 
     func edit(id: Int64, title: String, url: String, excerpt: String, note: String, folder: String) throws {
         // 编辑面板一次提交全部字段（含清空为 ""）。
         try run(["edit", String(id),
                  "--title", title, "--url", url, "--excerpt", excerpt,
-                 "--note", note, "--folder", folder])
+                 "--note", note, "--folder", folder, "--all"])
     }
 
-    func remove(id: Int64) throws { try run(["rm", String(id)]) }
+    func remove(id: Int64) throws { try run(["rm", String(id), "--all"]) }
 
-    func open(id: Int64) throws { try run(["open", String(id)]) }
+    func open(id: Int64) throws { try run(["open", String(id), "--all"]) }
 
-    func moveFolder(from old: String, to new: String) throws { try run(["mv", old, new]) }
+    func moveFolder(from old: String, to new: String) throws { try run(["mv", old, new, "--all"]) }
 }

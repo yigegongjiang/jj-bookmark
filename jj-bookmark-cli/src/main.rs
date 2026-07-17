@@ -11,10 +11,11 @@ mod store;
 mod timeutil;
 
 use anyhow::{Context, Result, anyhow, bail};
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
+use std::collections::BTreeMap;
 use std::time::Duration;
 
-use model::{Bookmark, Store, now_millis};
+use model::{Bookmark, DEFAULT_SOURCE, Store, now_millis};
 use query::{Order, SortKey};
 use store::{Paths, mutate, read_store};
 
@@ -30,6 +31,61 @@ struct Cli {
     cmd: Command,
 }
 
+#[derive(Args, Clone, Debug)]
+struct ScopeArgs {
+    /// Target source (default: default)
+    #[arg(long, value_name = "NAME", value_parser = parse_source, conflicts_with = "all")]
+    source: Option<String>,
+    /// Target all sources
+    #[arg(long)]
+    all: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Scope {
+    Source(String),
+    All,
+}
+
+impl ScopeArgs {
+    fn resolve(self) -> Scope {
+        if self.all {
+            Scope::All
+        } else {
+            Scope::Source(self.source.unwrap_or_else(|| DEFAULT_SOURCE.to_owned()))
+        }
+    }
+}
+
+impl Scope {
+    fn matches(&self, bookmark: &Bookmark) -> bool {
+        match self {
+            Scope::Source(source) => bookmark.source == *source,
+            Scope::All => true,
+        }
+    }
+
+    fn is_all(&self) -> bool {
+        matches!(self, Scope::All)
+    }
+
+    fn not_found(&self, id: i64) -> anyhow::Error {
+        match self {
+            Scope::Source(source) => anyhow!("bookmark #{id} not found in source {source:?}"),
+            Scope::All => anyhow!("bookmark #{id} not found"),
+        }
+    }
+}
+
+fn parse_source(value: &str) -> std::result::Result<String, String> {
+    let value = value.trim();
+    if value.is_empty() {
+        Err("source must not be empty".to_owned())
+    } else {
+        Ok(value.to_owned())
+    }
+}
+
 #[derive(Subcommand)]
 enum Command {
     /// Add a bookmark
@@ -42,6 +98,9 @@ enum Command {
         folder: Option<String>,
         #[arg(long)]
         note: Option<String>,
+        /// Target source
+        #[arg(long, default_value = DEFAULT_SOURCE, value_parser = parse_source)]
+        source: String,
         /// Fetch metadata synchronously now (off by default to avoid blocking; the App fetches in the background)
         #[arg(long)]
         fetch: bool,
@@ -57,9 +116,16 @@ enum Command {
         /// Emit the --json contract (consumed by the App/scripts)
         #[arg(long)]
         json: bool,
+        #[command(flatten)]
+        scope: ScopeArgs,
     },
     /// List existing folder paths, one per line
-    Folders,
+    Folders {
+        #[command(flatten)]
+        scope: ScopeArgs,
+    },
+    /// List all sources and bookmark counts
+    Sources,
     /// Search bookmarks by whitespace-separated keywords (sortable); `--filter` takes a native jq filter (run by embedded jaq)
     Query {
         /// Keyword (may be an empty string to match all, used with --filter)
@@ -75,9 +141,15 @@ enum Command {
         order: Option<Order>,
         #[arg(long)]
         json: bool,
+        #[command(flatten)]
+        scope: ScopeArgs,
     },
     /// Open the URL in the default browser and record the last visit
-    Open { id: i64 },
+    Open {
+        id: i64,
+        #[command(flatten)]
+        scope: ScopeArgs,
+    },
     /// Edit fields
     Edit {
         id: i64,
@@ -91,15 +163,26 @@ enum Command {
         note: Option<String>,
         #[arg(long)]
         excerpt: Option<String>,
+        /// Move the bookmark to another source
+        #[arg(long, value_name = "NAME", value_parser = parse_source)]
+        set_source: Option<String>,
+        #[command(flatten)]
+        scope: ScopeArgs,
     },
     /// Delete a bookmark
-    Rm { id: i64 },
+    Rm {
+        id: i64,
+        #[command(flatten)]
+        scope: ScopeArgs,
+    },
     /// Fetch and backfill metadata (title/excerpt/cover)
     Fetch {
         id: i64,
         /// Overwrite existing fields (by default only empty fields are filled, never user content)
         #[arg(long)]
         force: bool,
+        #[command(flatten)]
+        scope: ScopeArgs,
     },
     /// Rename / move a folder subtree (prefix-replace all matches, single atomic write)
     Mv {
@@ -107,6 +190,8 @@ enum Command {
         old: String,
         /// New folder path
         new: String,
+        #[command(flatten)]
+        scope: ScopeArgs,
     },
     /// Push the local data file to Cloudflare R2 (one-way; the web is read-only)
     Push,
@@ -116,23 +201,74 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let paths = Paths::resolve()?;
     match cli.cmd {
-        Command::Add { url, title, folder, note, fetch } => {
-            cmd_add(&paths, url, title, folder, note, fetch)
-        }
-        Command::Ls { folder, sort, order, json } => {
-            cmd_list(&paths, None, None, folder, sort, order, json)
-        }
-        Command::Folders => cmd_folders(&paths),
-        Command::Query { keyword, filter, folder, sort, order, json } => {
-            cmd_list(&paths, Some(keyword), filter, folder, sort, order, json)
-        }
-        Command::Open { id } => cmd_open(&paths, id),
-        Command::Edit { id, title, url, folder, note, excerpt } => {
-            cmd_edit(&paths, id, title, url, folder, note, excerpt)
-        }
-        Command::Rm { id } => cmd_rm(&paths, id),
-        Command::Fetch { id, force } => cmd_fetch(&paths, id, force),
-        Command::Mv { old, new } => cmd_mv(&paths, old, new),
+        Command::Add {
+            url,
+            title,
+            folder,
+            note,
+            source,
+            fetch,
+        } => cmd_add(&paths, url, title, folder, note, source, fetch),
+        Command::Ls {
+            folder,
+            sort,
+            order,
+            json,
+            scope,
+        } => cmd_list(
+            &paths,
+            None,
+            None,
+            folder,
+            sort,
+            order,
+            json,
+            scope.resolve(),
+        ),
+        Command::Folders { scope } => cmd_folders(&paths, scope.resolve()),
+        Command::Sources => cmd_sources(&paths),
+        Command::Query {
+            keyword,
+            filter,
+            folder,
+            sort,
+            order,
+            json,
+            scope,
+        } => cmd_list(
+            &paths,
+            Some(keyword),
+            filter,
+            folder,
+            sort,
+            order,
+            json,
+            scope.resolve(),
+        ),
+        Command::Open { id, scope } => cmd_open(&paths, id, scope.resolve()),
+        Command::Edit {
+            id,
+            title,
+            url,
+            folder,
+            note,
+            excerpt,
+            set_source,
+            scope,
+        } => cmd_edit(
+            &paths,
+            id,
+            title,
+            url,
+            folder,
+            note,
+            excerpt,
+            set_source,
+            scope.resolve(),
+        ),
+        Command::Rm { id, scope } => cmd_rm(&paths, id, scope.resolve()),
+        Command::Fetch { id, force, scope } => cmd_fetch(&paths, id, force, scope.resolve()),
+        Command::Mv { old, new, scope } => cmd_mv(&paths, old, new, scope.resolve()),
         Command::Push => cmd_push(&paths),
     }
 }
@@ -143,32 +279,40 @@ fn cmd_add(
     title: Option<String>,
     folder: Option<String>,
     note: Option<String>,
+    source: String,
     fetch: bool,
 ) -> Result<()> {
     let title = title.unwrap_or_else(|| url.clone()); // 无 --title 时用 URL 占位；抓取会回填
     let folder = folder.unwrap_or_default();
     let note = note.unwrap_or_default();
+    let fetch_scope = Scope::Source(source.clone());
     let id = mutate(paths, |store| {
         let id = unique_id(store);
-        store
-            .bookmarks
-            .push(Bookmark::new(id, url.clone(), title.clone(), folder.clone(), note.clone()));
+        store.bookmarks.push(Bookmark::new_with_source(
+            id,
+            source.clone(),
+            url.clone(),
+            title.clone(),
+            folder.clone(),
+            note.clone(),
+        ));
         Ok(id)
     })?;
     println!("Added #{id}");
     if fetch {
         // 同步抓取；失败不回滚（书签已保存），仅告警。
-        if let Err(e) = fetch_and_apply(paths, id, false) {
+        if let Err(e) = fetch_and_apply(paths, id, false, &fetch_scope) {
             eprintln!("Warning: metadata fetch failed (bookmark saved): {e:#}");
         }
     }
     Ok(())
 }
 
-fn cmd_folders(paths: &Paths) -> Result<()> {
+fn cmd_folders(paths: &Paths, scope: Scope) -> Result<()> {
     let mut folders: Vec<_> = read_store(paths)?
         .bookmarks
         .into_iter()
+        .filter(|bookmark| scope.matches(bookmark))
         .map(|b| b.folder)
         .filter(|folder| !folder.is_empty())
         .collect();
@@ -180,25 +324,44 @@ fn cmd_folders(paths: &Paths) -> Result<()> {
     Ok(())
 }
 
-fn cmd_fetch(paths: &Paths, id: i64, force: bool) -> Result<()> {
-    fetch_and_apply(paths, id, force)?;
+fn cmd_sources(paths: &Paths) -> Result<()> {
+    let mut counts = BTreeMap::new();
+    for bookmark in read_store(paths)?.bookmarks {
+        *counts.entry(bookmark.source).or_insert(0usize) += 1;
+    }
+    for (source, count) in counts {
+        println!("{source}\t{count}");
+    }
+    Ok(())
+}
+
+fn cmd_fetch(paths: &Paths, id: i64, force: bool, scope: Scope) -> Result<()> {
+    fetch_and_apply(paths, id, force, &scope)?;
     println!("Fetched #{id}");
     Ok(())
 }
 
 /// 抓取并回填元数据。网络请求在写锁**之外**进行（避免长时间持锁阻塞其他写），
 /// 抓取完成后再加锁应用。默认只填空字段；`force` 覆盖已有内容。
-fn fetch_and_apply(paths: &Paths, id: i64, force: bool) -> Result<()> {
+fn fetch_and_apply(paths: &Paths, id: i64, force: bool, scope: &Scope) -> Result<()> {
     let url = {
         let store = read_store(paths)?;
-        store.bookmarks.iter().find(|b| b.id == id).map(|b| b.url.clone())
+        store
+            .bookmarks
+            .iter()
+            .find(|b| b.id == id && scope.matches(b))
+            .map(|b| b.url.clone())
     }
-    .ok_or_else(|| anyhow!("bookmark #{id} not found"))?;
+    .ok_or_else(|| scope.not_found(id))?;
 
     let meta = fetcher::fetch(&url, Duration::from_secs(10))?;
 
     mutate(paths, |store| {
-        let b = store.find_mut(id).ok_or_else(|| anyhow!("bookmark #{id} not found"))?;
+        let b = store
+            .bookmarks
+            .iter_mut()
+            .find(|b| b.id == id && scope.matches(b))
+            .ok_or_else(|| scope.not_found(id))?;
         let mut changed = false;
         // title 占位（== url）或空时才回填，避免覆盖用户已设标题（除非 --force）。
         if let Some(t) = meta.title
@@ -234,9 +397,14 @@ fn cmd_list(
     sort: SortKey,
     order: Option<Order>,
     json: bool,
+    scope: Scope,
 ) -> Result<()> {
     let store = read_store(paths)?;
-    let mut bms = store.bookmarks;
+    let mut bms: Vec<_> = store
+        .bookmarks
+        .into_iter()
+        .filter(|bookmark| scope.matches(bookmark))
+        .collect();
     if let Some(kw) = keyword {
         bms = query::keyword_filter(bms, &kw);
     }
@@ -251,7 +419,7 @@ fn cmd_list(
     if json {
         output::print_json(&bms, store.version)?;
     } else {
-        output::print_human(&bms);
+        output::print_human(&bms, scope.is_all());
     }
     Ok(())
 }
@@ -281,9 +449,13 @@ fn apply_jq_filter(bms: &[Bookmark], version: u32, jq: &str) -> Result<Vec<Bookm
     Ok(result)
 }
 
-fn cmd_open(paths: &Paths, id: i64) -> Result<()> {
+fn cmd_open(paths: &Paths, id: i64, scope: Scope) -> Result<()> {
     let url = mutate(paths, |store| {
-        let b = store.find_mut(id).ok_or_else(|| anyhow!("bookmark #{id} not found"))?;
+        let b = store
+            .bookmarks
+            .iter_mut()
+            .find(|b| b.id == id && scope.matches(b))
+            .ok_or_else(|| scope.not_found(id))?;
         b.last_visited = now_millis(); // 记录访问；不改 updated（访问 ≠ 内容修改）
         Ok(b.url.clone())
     })?;
@@ -303,12 +475,26 @@ fn cmd_edit(
     folder: Option<String>,
     note: Option<String>,
     excerpt: Option<String>,
+    set_source: Option<String>,
+    scope: Scope,
 ) -> Result<()> {
-    if title.is_none() && url.is_none() && folder.is_none() && note.is_none() && excerpt.is_none() {
-        bail!("no fields provided to modify (--title/--url/--folder/--note/--excerpt)");
+    if title.is_none()
+        && url.is_none()
+        && folder.is_none()
+        && note.is_none()
+        && excerpt.is_none()
+        && set_source.is_none()
+    {
+        bail!(
+            "no fields provided to modify (--title/--url/--folder/--note/--excerpt/--set-source)"
+        );
     }
     mutate(paths, |store| {
-        let b = store.find_mut(id).ok_or_else(|| anyhow!("bookmark #{id} not found"))?;
+        let b = store
+            .bookmarks
+            .iter_mut()
+            .find(|b| b.id == id && scope.matches(b))
+            .ok_or_else(|| scope.not_found(id))?;
         if let Some(t) = title {
             b.title = t;
         }
@@ -324,6 +510,9 @@ fn cmd_edit(
         if let Some(e) = excerpt {
             b.excerpt = e;
         }
+        if let Some(source) = set_source {
+            b.source = source;
+        }
         b.updated = now_millis(); // 内容修改 → 更新 updated
         Ok(())
     })?;
@@ -331,12 +520,14 @@ fn cmd_edit(
     Ok(())
 }
 
-fn cmd_rm(paths: &Paths, id: i64) -> Result<()> {
+fn cmd_rm(paths: &Paths, id: i64, scope: Scope) -> Result<()> {
     mutate(paths, |store| {
         let before = store.bookmarks.len();
-        store.bookmarks.retain(|b| b.id != id);
+        store
+            .bookmarks
+            .retain(|b| !(b.id == id && scope.matches(b)));
         if store.bookmarks.len() == before {
-            bail!("bookmark #{id} not found"); // 在锁内报错 → 不产生无谓写
+            return Err(scope.not_found(id)); // 在锁内报错 → 不产生无谓写
         }
         Ok(())
     })?;
@@ -344,12 +535,15 @@ fn cmd_rm(paths: &Paths, id: i64) -> Result<()> {
     Ok(())
 }
 
-fn cmd_mv(paths: &Paths, old: String, new: String) -> Result<()> {
+fn cmd_mv(paths: &Paths, old: String, new: String, scope: Scope) -> Result<()> {
     let n = mutate(paths, |store| {
         let prefix = format!("{old} / ");
         let now = now_millis();
         let mut moved = 0;
         for b in &mut store.bookmarks {
+            if !scope.matches(b) {
+                continue;
+            }
             if b.folder == old {
                 b.folder = new.clone();
             } else if let Some(rest) = b.folder.strip_prefix(&prefix) {
@@ -384,4 +578,114 @@ fn unique_id(store: &Store) -> i64 {
         id += 1;
     }
     id
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::error::ErrorKind;
+    use std::fs;
+
+    fn temp_paths(tag: &str) -> Paths {
+        let dir = std::env::temp_dir().join(format!(
+            "jj-bookmark-main-test-{tag}-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        Paths::from_dir(dir)
+    }
+
+    #[test]
+    fn list_scope_defaults_to_default() {
+        let cli = Cli::try_parse_from(["jj-bookmark", "ls"]).unwrap();
+        let Command::Ls { scope, .. } = cli.cmd else {
+            panic!("expected ls")
+        };
+        assert_eq!(scope.resolve(), Scope::Source(DEFAULT_SOURCE.to_owned()));
+    }
+
+    #[test]
+    fn source_and_all_are_mutually_exclusive() {
+        let error = Cli::try_parse_from(["jj-bookmark", "ls", "--source", "safari", "--all"])
+            .err()
+            .expect("scope conflict must fail");
+        assert_eq!(error.kind(), ErrorKind::ArgumentConflict);
+    }
+
+    #[test]
+    fn source_is_trimmed_and_empty_is_rejected() {
+        let cli = Cli::try_parse_from(["jj-bookmark", "ls", "--source", " safari "]).unwrap();
+        let Command::Ls { scope, .. } = cli.cmd else {
+            panic!("expected ls")
+        };
+        assert_eq!(scope.resolve(), Scope::Source("safari".to_owned()));
+
+        assert!(Cli::try_parse_from(["jj-bookmark", "ls", "--source", " "]).is_err());
+    }
+
+    #[test]
+    fn scope_matches_expected_bookmarks() {
+        let default = Bookmark::new(1, "u".into(), "d".into(), "".into(), "".into());
+        let safari = Bookmark::new_with_source(
+            2,
+            "safari".into(),
+            "u".into(),
+            "s".into(),
+            "".into(),
+            "".into(),
+        );
+        let scope = Scope::Source(DEFAULT_SOURCE.to_owned());
+        assert!(scope.matches(&default));
+        assert!(!scope.matches(&safari));
+        assert!(Scope::All.matches(&safari));
+    }
+
+    #[test]
+    fn edit_respects_scope_and_can_move_source() {
+        let paths = temp_paths("edit-scope");
+        mutate(&paths, |store| {
+            store.bookmarks.push(Bookmark::new_with_source(
+                2,
+                "safari".into(),
+                "u".into(),
+                "old".into(),
+                "".into(),
+                "".into(),
+            ));
+            Ok(())
+        })
+        .unwrap();
+
+        let default_scope = Scope::Source(DEFAULT_SOURCE.to_owned());
+        let error = cmd_edit(
+            &paths,
+            2,
+            Some("blocked".into()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            default_scope,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("source \"default\""));
+
+        cmd_edit(
+            &paths,
+            2,
+            Some("moved".into()),
+            None,
+            None,
+            None,
+            None,
+            Some(DEFAULT_SOURCE.into()),
+            Scope::Source("safari".into()),
+        )
+        .unwrap();
+        let bookmark = read_store(&paths).unwrap().bookmarks.pop().unwrap();
+        assert_eq!(bookmark.title, "moved");
+        assert_eq!(bookmark.source, DEFAULT_SOURCE);
+        let _ = fs::remove_dir_all(&paths.dir);
+    }
 }

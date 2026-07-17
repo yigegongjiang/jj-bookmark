@@ -7,6 +7,15 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.11.0] - 2026-07-17
+
+- 书签支持 source 分组：CLI 默认仅操作 `default`，可用 `--source <NAME>` / `--all` 切换，`sources` 查看统计
+  - schema v2 每条新增 `source`（旧数据缺字段兜底 `default`）；所有读写命令共享 source scope，`add --source` 定向新增，`edit --set-source` 跨 source 移动，人类可读 `--all` 输出显示 source
+- App 与网页版默认显示全部 source
+  - App 的加载 / 编辑 / 删除 / 打开 / 抓取 / folder 移动显式走 CLI `--all`；App/Web 搜索纳入 `source`，Web 空库契约升至 v2
+- 删除一次性的 raindrop CSV `import` 子命令
+  - 删除 `importer.rs` / `csv` 依赖 / 仅服务导入的时间解析，CLI 回归核心读写路径
+
 ## [0.10.0] - 2026-07-17
 
 - macOS 通用版：一份安装包同时支持 Apple Silicon 与 Intel Mac

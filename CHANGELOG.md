@@ -11,6 +11,17 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.11.0] - 2026-07-17
+
+### Added
+
+- 书签支持 source 分组：CLI 默认仅操作 `default`，可用 `--source <NAME>` / `--all` 切换，`sources` 查看统计
+- App 与网页版默认显示全部 source
+
+### Removed
+
+- 删除一次性的 raindrop CSV `import` 子命令
+
 ## [0.10.0] - 2026-07-17
 
 ### Added
@@ -107,6 +118,7 @@
 - App 三栏浏览 + 文件夹树 + 即时搜索；终端改动后无需重启即刷新
 - 查询：内嵌 jq 引擎的 `--filter`，数据文件也可直接用 `jq` 处理
 
+[0.11.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.11.0
 [0.10.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.10.0
 [0.9.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.9.0
 [0.2.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.2.0

@@ -9,7 +9,12 @@ use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// 当前 schema 版本（data-model §8）。
-pub const CURRENT_VERSION: u32 = 1;
+pub const CURRENT_VERSION: u32 = 2;
+pub const DEFAULT_SOURCE: &str = "default";
+
+fn default_source() -> String {
+    DEFAULT_SOURCE.to_owned()
+}
 
 /// 顶层结构 `{ version, bookmarks }`。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,20 +25,23 @@ pub struct Store {
 
 impl Default for Store {
     fn default() -> Self {
-        Store { version: CURRENT_VERSION, bookmarks: Vec::new() }
+        Store {
+            version: CURRENT_VERSION,
+            bookmarks: Vec::new(),
+        }
     }
 }
 
 impl Store {
     /// 写入前归一：重算所有派生 `*_jst`，保证与数字主字段一致（含手改场景）。
     pub fn normalize(&mut self) {
+        self.version = CURRENT_VERSION;
         for b in &mut self.bookmarks {
+            if b.source.trim().is_empty() {
+                b.source = default_source();
+            }
             b.normalize_jst();
         }
-    }
-
-    pub fn find_mut(&mut self, id: i64) -> Option<&mut Bookmark> {
-        self.bookmarks.iter_mut().find(|b| b.id == id)
     }
 }
 
@@ -44,6 +52,8 @@ impl Store {
 pub struct Bookmark {
     #[serde(default)]
     pub id: i64,
+    #[serde(default = "default_source")]
+    pub source: String,
     #[serde(default)]
     pub title: String,
     #[serde(default)]
@@ -76,10 +86,23 @@ pub struct Bookmark {
 
 impl Bookmark {
     /// 新建书签：`created == updated == now`，`last_visited == 0`（data-model §3）。
+    #[cfg(test)]
     pub fn new(id: i64, url: String, title: String, folder: String, note: String) -> Self {
+        Self::new_with_source(id, default_source(), url, title, folder, note)
+    }
+
+    pub fn new_with_source(
+        id: i64,
+        source: String,
+        url: String,
+        title: String,
+        folder: String,
+        note: String,
+    ) -> Self {
         let now = now_millis();
         let mut b = Bookmark {
             id,
+            source,
             title,
             url,
             excerpt: String::new(),
@@ -117,4 +140,28 @@ pub fn now_millis() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_source_defaults_to_default() {
+        let bookmark: Bookmark = serde_json::from_value(serde_json::json!({ "id": 1 })).unwrap();
+        assert_eq!(bookmark.source, DEFAULT_SOURCE);
+    }
+
+    #[test]
+    fn normalize_upgrades_schema_and_repairs_empty_source() {
+        let mut bookmark = Bookmark::new(1, "u".into(), "t".into(), "".into(), "".into());
+        bookmark.source.clear();
+        let mut store = Store {
+            version: 1,
+            bookmarks: vec![bookmark],
+        };
+        store.normalize();
+        assert_eq!(store.version, CURRENT_VERSION);
+        assert_eq!(store.bookmarks[0].source, DEFAULT_SOURCE);
+    }
 }

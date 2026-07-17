@@ -4,6 +4,7 @@ import Foundation
 // nonisolated：纯值类型，可在任意线程解码/传递（避开 defaultIsolation(MainActor) 限制）。
 nonisolated struct Bookmark: Identifiable, Sendable, Hashable {
     var id: Int64
+    var source: String
     var title: String
     var url: String
     var excerpt: String
@@ -22,7 +23,7 @@ nonisolated struct Bookmark: Identifiable, Sendable, Hashable {
 
 extension Bookmark: Decodable {
     enum CodingKeys: String, CodingKey {
-        case id, title, url, excerpt, note, folder, cover, tags, favorite
+        case id, source, title, url, excerpt, note, folder, cover, tags, favorite
         case created
         case createdJst = "created_jst"
         case updated
@@ -35,6 +36,7 @@ extension Bookmark: Decodable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decodeIfPresent(Int64.self, forKey: .id) ?? 0
+        source = try c.decodeIfPresent(String.self, forKey: .source) ?? "default"
         title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
         url = try c.decodeIfPresent(String.self, forKey: .url) ?? ""
         excerpt = try c.decodeIfPresent(String.self, forKey: .excerpt) ?? ""
@@ -69,7 +71,7 @@ extension Bookmark {
     func matchesSearch(_ query: String) -> Bool {
         let terms = query.split(whereSeparator: { $0.isWhitespace }).map { $0.lowercased() }
         if terms.isEmpty { return true }
-        let searchable = [title, url, excerpt, note, folder, tags.joined(separator: " ")]
+        let searchable = [source, title, url, excerpt, note, folder, tags.joined(separator: " ")]
             .joined(separator: " ")
             .lowercased()
         return terms.allSatisfy { searchable.contains($0) }

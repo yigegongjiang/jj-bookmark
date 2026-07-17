@@ -267,7 +267,7 @@
 
       // ---- 过滤 + 排序（内存，仿 CLI/app 语义） ----
       function searchableText(b) {
-        return [b.title, b.url, b.excerpt, b.note, b.folder, (b.tags || []).join(" ")]
+        return [b.source, b.title, b.url, b.excerpt, b.note, b.folder, (b.tags || []).join(" ")]
           .join(" ")
           .toLowerCase();
       }

@@ -1,0 +1,17 @@
+# Cloudflare Worker：只读 preview page + /api/bookmarks（读 R2）。
+# 认证由 Cloudflare Access（Google IdP）在边缘网关，Worker 自身不做鉴权（见 README）。
+name = "jj-bookmark-web"
+main = "src/index.js"
+compatibility_date = "2026-07-17"
+
+# 静态资源（preview page）。匹配到的路径先于 Worker 返回；未命中才进 fetch。
+# binding=ASSETS 供 Worker 内 env.ASSETS.fetch() 兜底非 /api 路由。
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# R2 绑定：CLI push 上传的 bookmarks.json 落在此 bucket，Worker 直接读。
+# bucket 需在 Cloudflare 侧预先创建（见 README），否则 deploy 校验失败。
+[[r2_buckets]]
+binding = "BOOKMARKS"
+bucket_name = "jj-bookmark"

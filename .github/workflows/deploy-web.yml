@@ -1,0 +1,26 @@
+name: deploy-web
+
+# 改动 web 组件即部署 Worker（含静态 preview page）。与 release.yml（tag 触发、打 macOS 包）互不干扰。
+# secrets 由人类配置：CLOUDFLARE_API_TOKEN（Workers + R2 编辑权限）、CLOUDFLARE_ACCOUNT_ID。
+on:
+  push:
+    branches: [master]
+    paths:
+      - "jj-bookmark-web/**"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: jj-bookmark-web
+          # pin 版本 = 与本地 package.json / 验证环境一致，避免 latest 漂移致构建行为变化
+          wranglerVersion: "4.111.0"
+          command: deploy

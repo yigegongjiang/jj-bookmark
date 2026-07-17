@@ -11,6 +11,13 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.9.0] - 2026-07-17
+
+### Added
+
+- 新增 `jj-bookmark push`：把本地书签单向同步到网页版，浏览器里随处只读查看
+- 网页版：只读预览页，支持文件夹树、多关键词搜索与排序；经 Google 登录访问
+
 ## [0.8.0] - 2026-07-16
 
 ### Changed
@@ -90,6 +97,7 @@
 - App 三栏浏览 + 文件夹树 + 即时搜索；终端改动后无需重启即刷新
 - 查询：内嵌 jq 引擎的 `--filter`，数据文件也可直接用 `jq` 处理
 
+[0.9.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.9.0
 [0.2.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.2.0
 [0.1.2]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.1.2
 [0.1.1]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.1.1

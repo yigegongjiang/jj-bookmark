@@ -6,6 +6,7 @@ mod filter;
 mod importer;
 mod model;
 mod output;
+mod pusher;
 mod query;
 mod store;
 mod timeutil;
@@ -112,6 +113,8 @@ enum Command {
     },
     /// Import from a raindrop CSV
     Import { csv: PathBuf },
+    /// Push the local data file to Cloudflare R2 (one-way; the web is read-only)
+    Push,
 }
 
 fn main() -> Result<()> {
@@ -136,6 +139,7 @@ fn main() -> Result<()> {
         Command::Fetch { id, force } => cmd_fetch(&paths, id, force),
         Command::Mv { old, new } => cmd_mv(&paths, old, new),
         Command::Import { csv } => cmd_import(&paths, &csv),
+        Command::Push => cmd_push(&paths),
     }
 }
 
@@ -388,6 +392,14 @@ fn cmd_import(paths: &Paths, csv: &Path) -> Result<()> {
         Ok((imported, skipped))
     })?;
     println!("Import complete: {total} parsed, {imported} added, {skipped} skipped (id already exists)");
+    Ok(())
+}
+
+/// 单向同步：把本地数据文件上传到固定 Cloudflare R2 目标（经 wrangler）。web 侧只读，无 pull。
+fn cmd_push(paths: &Paths) -> Result<()> {
+    println!("Pushing {} → R2 {}/{}", paths.data.display(), pusher::BUCKET, pusher::KEY);
+    pusher::push(paths)?;
+    println!("Pushed to R2: {}/{}", pusher::BUCKET, pusher::KEY);
     Ok(())
 }
 

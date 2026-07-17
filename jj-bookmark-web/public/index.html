@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>jj-bookmark</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --bg-side: #f5f5f7;
+        --bg-header: #fbfbfd;
+        --border: #e0e0e2;
+        --row-alt: #f7f7f9;
+        --row-hover: #ececef;
+        --sel: #0a66ff;
+        --sel-fg: #ffffff;
+        --fg: #1d1d1f;
+        --fg-2: #6e6e73;
+        --domain: #d3202a;
+        --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+          Arial, "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1e1e1e;
+          --bg-side: #252526;
+          --bg-header: #2a2a2b;
+          --border: #3a3a3c;
+          --row-alt: #242425;
+          --row-hover: #323234;
+          --sel: #0a66ff;
+          --sel-fg: #ffffff;
+          --fg: #f5f5f7;
+          --fg-2: #9a9a9e;
+          --domain: #ff6b6b;
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        font-family: var(--font);
+        font-size: 13px;
+        color: var(--fg);
+        background: var(--bg);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      header {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: var(--bg-header);
+        border-bottom: 1px solid var(--border);
+      }
+      header input[type="search"] {
+        flex: 1 1 220px;
+        min-width: 120px;
+        max-width: 420px;
+        padding: 5px 10px;
+        font: inherit;
+        color: var(--fg);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        outline: none;
+      }
+      header input[type="search"]:focus { border-color: var(--sel); }
+      header select, header button {
+        font: inherit;
+        color: var(--fg);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 5px 8px;
+        cursor: pointer;
+      }
+      header .count { margin-left: auto; color: var(--fg-2); font-size: 12px; white-space: nowrap; }
+      main { flex: 1 1 auto; display: flex; min-height: 0; }
+      #sidebar {
+        flex: 0 0 240px;
+        overflow: auto;
+        background: var(--bg-side);
+        border-right: 1px solid var(--border);
+        padding: 6px 0;
+        user-select: none;
+      }
+      #list { flex: 1 1 auto; overflow: auto; }
+
+      /* folder 树 */
+      .fnode { display: flex; align-items: center; padding: 3px 8px; cursor: pointer; white-space: nowrap; }
+      .fnode:hover { background: var(--row-hover); }
+      .fnode.sel { background: var(--sel); color: var(--sel-fg); }
+      .fnode.sel .fcount { color: var(--sel-fg); opacity: 0.85; }
+      .ftwisty { width: 14px; flex: 0 0 14px; text-align: center; color: var(--fg-2); font-size: 10px; }
+      .fnode.sel .ftwisty { color: var(--sel-fg); }
+      .fname { overflow: hidden; text-overflow: ellipsis; }
+      .fcount { margin-left: 6px; color: var(--fg-2); font-size: 11px; }
+
+      /* 书签行 */
+      .row {
+        padding: 7px 14px;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+      }
+      .row:nth-child(even) { background: var(--row-alt); }
+      .row:hover { background: var(--row-hover); }
+      .row .title {
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .row .sub {
+        margin-top: 2px;
+        color: var(--fg-2);
+        font-size: 11px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .row .dom { color: var(--domain); font-weight: 600; }
+      .empty { padding: 40px; text-align: center; color: var(--fg-2); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <input type="search" id="q" placeholder="Search bookmarks" autocomplete="off" spellcheck="false" />
+      <select id="sort">
+        <option value="created">Date Added</option>
+        <option value="updated">Date Modified</option>
+        <option value="visited">Last Visited</option>
+        <option value="title">Name</option>
+      </select>
+      <button id="order" title="Toggle sort order">↓ Descending</button>
+      <span class="count" id="count"></span>
+    </header>
+    <main>
+      <nav id="sidebar"></nav>
+      <section id="list"></section>
+    </main>
+
+    <script>
+      // ---- 状态 ----
+      let ALL = [];
+      let selectedFolder = null; // null = All；"" = Uncategorized；否则 folder 路径
+      let query = "";
+      let sortKey = "created";
+      let order = "desc";
+      const DEFAULT_ORDER = { created: "desc", updated: "desc", visited: "desc", title: "asc" };
+      const collapsed = new Set(); // 折叠的 folder 路径
+
+      const $ = (id) => document.getElementById(id);
+
+      // ---- 拉取数据 ----
+      async function load() {
+        try {
+          const r = await fetch("/api/bookmarks", { cache: "no-store" });
+          const data = await r.json();
+          ALL = Array.isArray(data.bookmarks) ? data.bookmarks : [];
+        } catch (e) {
+          ALL = [];
+        }
+        renderSidebar();
+        renderList();
+      }
+
+      // ---- folder 树构建（扁平 "A / B / C" 路径 → 嵌套） ----
+      function buildTree() {
+        const root = { name: "", path: "", children: new Map() };
+        for (const b of ALL) {
+          const f = (b.folder || "").trim();
+          if (!f) continue;
+          const parts = f.split(" / ");
+          let node = root;
+          let acc = [];
+          for (const p of parts) {
+            acc.push(p);
+            const path = acc.join(" / ");
+            if (!node.children.has(p)) {
+              node.children.set(p, { name: p, path, children: new Map() });
+            }
+            node = node.children.get(p);
+          }
+        }
+        return root;
+      }
+
+      function subtreeCount(path) {
+        const prefix = path + " / ";
+        let n = 0;
+        for (const b of ALL) {
+          const f = b.folder || "";
+          if (f === path || f.startsWith(prefix)) n++;
+        }
+        return n;
+      }
+
+      function uncategorizedCount() {
+        return ALL.reduce((n, b) => n + ((b.folder || "") === "" ? 1 : 0), 0);
+      }
+
+      // ---- 侧栏渲染 ----
+      function renderSidebar() {
+        const side = $("sidebar");
+        side.textContent = "";
+        // All
+        side.appendChild(folderRow({ name: "All", path: null }, 0, ALL.length, false, false));
+        // 真实 folder 树
+        const tree = buildTree();
+        const roots = [...tree.children.values()].sort((a, b) => a.name.localeCompare(b.name));
+        for (const n of roots) renderNode(side, n, 1);
+        // Uncategorized（若有）
+        const u = uncategorizedCount();
+        if (u > 0) side.appendChild(folderRow({ name: "Uncategorized", path: "" }, 0, u, false, false));
+      }
+
+      function renderNode(container, node, depth) {
+        const kids = [...node.children.values()].sort((a, b) => a.name.localeCompare(b.name));
+        const hasKids = kids.length > 0;
+        const isCollapsed = collapsed.has(node.path);
+        container.appendChild(
+          folderRow({ name: node.name, path: node.path }, depth, subtreeCount(node.path), hasKids, isCollapsed)
+        );
+        if (hasKids && !isCollapsed) for (const k of kids) renderNode(container, k, depth + 1);
+      }
+
+      function folderRow(item, depth, count, hasKids, isCollapsed) {
+        const el = document.createElement("div");
+        el.className = "fnode" + (selectedFolder === item.path ? " sel" : "");
+        el.style.paddingLeft = 8 + depth * 14 + "px";
+
+        const tw = document.createElement("span");
+        tw.className = "ftwisty";
+        tw.textContent = hasKids ? (isCollapsed ? "▶" : "▼") : "";
+        if (hasKids) {
+          tw.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (collapsed.has(item.path)) collapsed.delete(item.path);
+            else collapsed.add(item.path);
+            renderSidebar();
+          });
+        }
+        el.appendChild(tw);
+
+        const name = document.createElement("span");
+        name.className = "fname";
+        name.textContent = item.name;
+        el.appendChild(name);
+
+        const c = document.createElement("span");
+        c.className = "fcount";
+        c.textContent = count;
+        el.appendChild(c);
+
+        el.addEventListener("click", () => {
+          selectedFolder = item.path;
+          renderSidebar();
+          renderList();
+        });
+        return el;
+      }
+
+      // ---- 过滤 + 排序（内存，仿 CLI/app 语义） ----
+      function searchableText(b) {
+        return [b.title, b.url, b.excerpt, b.note, b.folder, (b.tags || []).join(" ")]
+          .join(" ")
+          .toLowerCase();
+      }
+
+      function visibleBookmarks() {
+        let list = ALL;
+        if (selectedFolder !== null) {
+          if (selectedFolder === "") {
+            list = list.filter((b) => (b.folder || "") === "");
+          } else {
+            const prefix = selectedFolder + " / ";
+            list = list.filter((b) => {
+              const f = b.folder || "";
+              return f === selectedFolder || f.startsWith(prefix);
+            });
+          }
+        }
+        const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+        if (terms.length) {
+          list = list.filter((b) => {
+            const s = searchableText(b);
+            return terms.every((t) => s.includes(t));
+          });
+        }
+        return sortBookmarks(list.slice());
+      }
+
+      function sortBookmarks(list) {
+        const dir = order === "asc" ? 1 : -1;
+        list.sort((a, b) => {
+          let p = 0;
+          if (sortKey === "title") {
+            p = (a.title || "").toLowerCase().localeCompare((b.title || "").toLowerCase());
+          } else {
+            const key = sortKey === "visited" ? "last_visited" : sortKey;
+            p = (a[key] || 0) - (b[key] || 0);
+          }
+          if (p !== 0) return p * dir;
+          return (b.id || 0) - (a.id || 0); // 次级键固定 id desc（与 CLI 一致）
+        });
+        return list;
+      }
+
+      // ---- 列表渲染 ----
+      function renderList() {
+        const list = $("list");
+        list.textContent = "";
+        const vis = visibleBookmarks();
+        $("count").textContent =
+          vis.length === ALL.length ? `${ALL.length} items` : `${vis.length} / ${ALL.length} items`;
+
+        if (vis.length === 0) {
+          const e = document.createElement("div");
+          e.className = "empty";
+          e.textContent = ALL.length === 0 ? "No bookmarks yet — push from the CLI." : "No matches.";
+          list.appendChild(e);
+          return;
+        }
+        const frag = document.createDocumentFragment();
+        for (const b of vis) frag.appendChild(bookmarkRow(b));
+        list.appendChild(frag);
+      }
+
+      function bookmarkRow(b) {
+        const row = document.createElement("div");
+        row.className = "row";
+        row.title = b.url || "";
+        row.addEventListener("click", () => {
+          if (b.url) window.open(b.url, "_blank", "noopener,noreferrer");
+        });
+
+        const title = document.createElement("div");
+        title.className = "title";
+        title.textContent = b.title && b.title.length ? b.title : b.url || "(untitled)";
+        row.appendChild(title);
+
+        const sub = document.createElement("div");
+        sub.className = "sub";
+        appendUrlWithDomain(sub, b.url || "");
+        const meta = [];
+        if (b.folder) meta.push(b.folder);
+        const date = (b.created_jst || "").slice(0, 10);
+        if (date) meta.push(date);
+        if (meta.length) {
+          const rest = document.createElement("span");
+          rest.textContent = "  ·  " + meta.join("  ·  ");
+          sub.appendChild(rest);
+        }
+        row.appendChild(sub);
+        return row;
+      }
+
+      // 在 url 文本里高亮可注册主域名（eTLD+1，轻量启发式，非完整 PSL）
+      function appendUrlWithDomain(container, url) {
+        const dom = registrableDomain(url);
+        const idx = dom ? url.toLowerCase().indexOf(dom.toLowerCase()) : -1;
+        if (idx < 0) {
+          container.appendChild(document.createTextNode(url));
+          return;
+        }
+        container.appendChild(document.createTextNode(url.slice(0, idx)));
+        const span = document.createElement("span");
+        span.className = "dom";
+        span.textContent = url.slice(idx, idx + dom.length);
+        container.appendChild(span);
+        container.appendChild(document.createTextNode(url.slice(idx + dom.length)));
+      }
+
+      // 常见二级公共后缀（best-effort，覆盖日/英/中主流；非完整 PSL）
+      const SLD = new Set([
+        "co", "ne", "or", "ac", "go", "ad", "ed", "gr", "lg", // .jp
+        "com", "net", "org", "gov", "edu", "ac2", // 通用二级
+      ]);
+      function registrableDomain(url) {
+        let host;
+        try {
+          host = new URL(url).hostname;
+        } catch {
+          try {
+            host = new URL("https://" + url).hostname;
+          } catch {
+            return null;
+          }
+        }
+        if (!host) return null;
+        const labels = host.split(".").filter(Boolean);
+        if (labels.length <= 2) return host;
+        const last = labels[labels.length - 1];
+        const second = labels[labels.length - 2];
+        // ccTLD（2 字母）+ 已知二级后缀 → 取末三段（如 example.co.jp）
+        if (last.length === 2 && SLD.has(second)) {
+          return labels.slice(-3).join(".");
+        }
+        return labels.slice(-2).join(".");
+      }
+
+      // ---- 事件 ----
+      $("q").addEventListener("input", (e) => {
+        query = e.target.value;
+        renderList();
+      });
+      $("sort").addEventListener("change", (e) => {
+        sortKey = e.target.value;
+        order = DEFAULT_ORDER[sortKey];
+        syncOrderButton();
+        renderList();
+      });
+      $("order").addEventListener("click", () => {
+        order = order === "asc" ? "desc" : "asc";
+        syncOrderButton();
+        renderList();
+      });
+      function syncOrderButton() {
+        $("order").textContent = order === "asc" ? "↑ Ascending" : "↓ Descending";
+      }
+
+      load();
+    </script>
+  </body>
+</html>

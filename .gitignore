@@ -1,5 +1,9 @@
 # 规划/设计文档与真实导入数据（含内网 URL / 截图），仅本地保留，不入库
 plans/
 
+# jj-bookmark-web：依赖 + wrangler 本地状态（.wrangler 含本地 R2 模拟里的真实书签数据），不入库
+jj-bookmark-web/node_modules/
+jj-bookmark-web/.wrangler/
+
 # macOS
 .DS_Store

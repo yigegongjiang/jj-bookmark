@@ -9,6 +9,7 @@
 # 可用工具
 
 - `gh` — 已登录（git push）
+- `npx wrangler` — Cloudflare CLI（web 调试 / R2 / 部署）；本机经 npx，无全局二进制
 
 # 调试
 
@@ -23,6 +24,11 @@
   - 构建 + 组装 `.app`（内嵌同版本 CLI）：`./jj-bookmark-app/package.sh [release|debug]`  # 默认 release
   - 运行：`open jj-bookmark-app/build/jj-bookmark.app`
   - 验证跨进程刷新：改动 `~/.config/jj-bookmark/bookmarks.json` 后 App 无需重启即刷新（FSEvents）
+- Web（`jj-bookmark-web/`，本地无需云端登录）：
+  - 装依赖：`cd jj-bookmark-web && npm install`
+  - 塞本地模拟 R2：`npx wrangler r2 object put jj-bookmark/bookmarks.json --file ~/.config/jj-bookmark/bookmarks.json --local`
+  - 起服务：`npm run dev`（`wrangler dev`，默认 `http://localhost:8787`；与上一步共享 `.wrangler/` 本地持久化）
+  - 验证：`curl localhost:8787/api/bookmarks | jq '.bookmarks|length'` + 浏览器看 preview page 搜索 / 排序 / folder 过滤
 
 # 发布
 
@@ -89,3 +95,12 @@ git push origin vX.Y.Z
 - 未签名/未公证 → 用户首次运行需 `xattr -dr com.apple.quarantine <path>`。
 
 > tag 与 `VERSION` 不一致时 CI 直接失败（tag 已推送但不出 Release）；发前务必对齐。
+
+## 6. Web 部署（独立 GHA，与 tag 发布解耦）
+
+源: `.github/workflows/deploy-web.yml`。触发：push `master` 且改动 `jj-bookmark-web/**`（或 workflow_dispatch），跑 `wrangler deploy`。与 §5 tag 发布互不干扰。
+
+- secrets（人类在仓库配置）：`CLOUDFLARE_API_TOKEN`（Workers + R2 权限）、`CLOUDFLARE_ACCOUNT_ID`。
+- 前置（人类在 Cloudflare 侧）：建 R2 bucket `jj-bookmark`；配 Access（Google IdP）网关 Worker 域名。详见 [jj-bookmark-web/README.md](./jj-bookmark-web/README.md)。
+
+> 数据含内网 URL。Worker 在 R2 对象缺失时只返回空库，故未 `push` 前即使裸部署也不泄漏；但 **MUST 先确认 Access 生效，再 `jj-bookmark push` 灌真实数据**。secrets/bucket 未就绪时 deploy GHA 失败即空转，无副作用。

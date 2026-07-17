@@ -23,16 +23,11 @@ pub struct Paths {
 }
 
 impl Paths {
-    /// 解析数据目录：优先 `JJ_BOOKMARK_DIR`（便于测试隔离），否则 `~/.config/jj-bookmark`。
+    /// 解析数据目录：固定 `~/.config/jj-bookmark`（与 App 一致，单一位置）。
+    /// 测试隔离直接用 [`Paths::from_dir`] 构造，无需 env 钩子。
     pub fn resolve() -> Result<Paths> {
-        let dir = match std::env::var_os("JJ_BOOKMARK_DIR") {
-            Some(d) => PathBuf::from(d),
-            None => {
-                let home = std::env::var_os("HOME").context("environment variable HOME is not set")?;
-                PathBuf::from(home).join(".config").join("jj-bookmark")
-            }
-        };
-        Ok(Paths::from_dir(dir))
+        let home = std::env::var_os("HOME").context("environment variable HOME is not set")?;
+        Ok(Paths::from_dir(PathBuf::from(home).join(".config").join("jj-bookmark")))
     }
 
     pub fn from_dir(dir: PathBuf) -> Paths {

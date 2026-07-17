@@ -1,9 +1,8 @@
-//! jj-bookmark CLI — 唯一核心。读写协议 / 查询 / 导入 / 抓取只在此实现一遍，
+//! jj-bookmark CLI — 唯一核心。读写协议 / 查询 / 抓取只在此实现一遍，
 //! App 经内嵌调用复用。命令见 roadmap.md，数据契约见 data-model.md。
 
 mod fetcher;
 mod filter;
-mod importer;
 mod model;
 mod output;
 mod pusher;
@@ -13,8 +12,6 @@ mod timeutil;
 
 use anyhow::{Context, Result, anyhow, bail};
 use clap::{Parser, Subcommand};
-use std::collections::HashSet;
-use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use model::{Bookmark, Store, now_millis};
@@ -111,8 +108,6 @@ enum Command {
         /// New folder path
         new: String,
     },
-    /// Import from a raindrop CSV
-    Import { csv: PathBuf },
     /// Push the local data file to Cloudflare R2 (one-way; the web is read-only)
     Push,
 }
@@ -138,7 +133,6 @@ fn main() -> Result<()> {
         Command::Rm { id } => cmd_rm(&paths, id),
         Command::Fetch { id, force } => cmd_fetch(&paths, id, force),
         Command::Mv { old, new } => cmd_mv(&paths, old, new),
-        Command::Import { csv } => cmd_import(&paths, &csv),
         Command::Push => cmd_push(&paths),
     }
 }
@@ -372,26 +366,6 @@ fn cmd_mv(paths: &Paths, old: String, new: String) -> Result<()> {
         Ok(moved)
     })?;
     println!("Moved {n} bookmark(s): {old} → {new}");
-    Ok(())
-}
-
-fn cmd_import(paths: &Paths, csv: &Path) -> Result<()> {
-    let incoming = importer::parse_raindrop_csv(csv)?;
-    let total = incoming.len();
-    let (imported, skipped) = mutate(paths, |store| {
-        let mut seen: HashSet<i64> = store.bookmarks.iter().map(|b| b.id).collect();
-        let (mut imported, mut skipped) = (0usize, 0usize);
-        for b in incoming {
-            if seen.insert(b.id) {
-                store.bookmarks.push(b);
-                imported += 1;
-            } else {
-                skipped += 1; // id 已存在（库内或 CSV 内重复）
-            }
-        }
-        Ok((imported, skipped))
-    })?;
-    println!("Import complete: {total} parsed, {imported} added, {skipped} skipped (id already exists)");
     Ok(())
 }
 

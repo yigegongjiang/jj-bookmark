@@ -20,19 +20,15 @@
   - 测试：`cargo test`
   - 类型检查：`cargo check`
 - App（`jj-bookmark-app/`）：
-  - 快速编译：`cd jj-bookmark-app && swift build`
-  - 构建 + 组装 `.app`（内嵌同版本 CLI）：`./jj-bookmark-app/package.sh [release|debug]`  # 默认 release
+  - 快速编译（本机架构，快，不组装 bundle）：`cd jj-bookmark-app && swift build`
+  - 构建 + 组装 `.app`（Release + 内嵌同版本 CLI）：`./jj-bookmark-app/package.sh [host|universal]`  # 默认 host（本机架构）；universal = arm64+x86_64 双架构，CI 用
   - 运行：`open jj-bookmark-app/build/jj-bookmark.app`
   - 验证跨进程刷新：改动 `~/.config/jj-bookmark/bookmarks.json` 后 App 无需重启即刷新（FSEvents）
-- Web（`jj-bookmark-web/`，本地无需云端登录）：
-  - 装依赖：`cd jj-bookmark-web && npm install`
-  - 塞本地模拟 R2：`npx wrangler r2 object put jj-bookmark/bookmarks.json --file ~/.config/jj-bookmark/bookmarks.json --local`
-  - 起服务：`npm run dev`（`wrangler dev`，默认 `http://localhost:8787`；与上一步共享 `.wrangler/` 本地持久化）
-  - 验证：`curl localhost:8787/api/bookmarks | jq '.bookmarks|length'` + 浏览器看 preview page 搜索 / 排序 / folder 过滤
+- Web（`jj-bookmark-web/`）：AI 跳过本地运行时调试 —— 起 `wrangler dev` / 塞本地 R2 / curl / 浏览器验证在当前 project 均耗时且无收益；代码变更直接进 §3 提交，push master 由 §6 GHA 自动部署，出错人类自行发现。
 
 # 发布
 
-代码变更完成后立即执行（= 需求交付的最后环节）。发布 = 版本落定 + 本机安装 + push tag。交付闸 = CLI `cargo test`（§1）+ `scripts/install-local.sh` 打包成功（打 release 包 + 装 /Applications，任一步失败即非 0 退出中止）。push tag `vX.Y.Z` 触发 GHA（`.github/workflows/release.yml`）后台打包 macOS App + CLI 并创建 GitHub Release —— fire-and-forget，本地无需观察（出错人类自行发现）。
+代码变更完成后立即执行（= 需求交付的最后环节）。发布 = 版本落定 + 本机安装 + push tag。交付闸 = CLI `cargo test`（§1）+ `scripts/install-local.sh` 打包成功（本机架构 Release + 装 /Applications，任一步失败即非 0 退出中止）。push tag `vX.Y.Z` 触发 GHA（`.github/workflows/release.yml`）后台打 universal Release 包（arm64+x86_64）并创建 GitHub Release —— fire-and-forget，本地无需观察（出错人类自行发现）。
 
 ## TL;DR
 
@@ -57,7 +53,7 @@
 ## 3. 本机发布 + 提交
 
 ```bash
-./scripts/install-local.sh          # 打 release 包 → 装 /Applications（打包失败则非 0 退出中止）
+./scripts/install-local.sh          # 打本机架构 Release 包 → 装 /Applications（打包失败则非 0 退出中止）
 git add -A
 git commit -m "release: vX.Y.Z"
 git tag -a vX.Y.Z -m "vX.Y.Z"
@@ -88,9 +84,9 @@ git push origin vX.Y.Z
 源: `.github/workflows/release.yml`。本机交付闸 = §3 `install-local.sh`；GHA 仅后台产出可分发产物（下载后带 quarantine，故 CI 才需 ad-hoc 签名），不作发布门禁，出错人类自行发现。
 
 - 触发：push tag `v*`。
-- runner：`macos-26`（`.defaultIsolation` 需 Swift 6.2 / Xcode 26+；`macos-15` 仅 Xcode 16.x 不可用，勿降级）。
-- 步骤：校验 `tag == vVERSION` → 选最新 Xcode + 断言 Swift ≥ 6.2 → rustup stable → `package.sh release` → ad-hoc 签名 → `ditto` 打 zip → `gh release create`。
-- 产物（arm64 原生，未做 universal）：`jj-bookmark-macos-arm64.zip`（.app）、`jj-bookmark-cli-macos-arm64`（CLI）、`SHA256SUMS.txt`。
+- runner：`macos-26`（`.defaultIsolation` 需 Swift 6.2 / Xcode 26+；`macos-15` 仅 Xcode 16.x 不可用，勿降级）。runner 本身 arm64；x86_64 slice 由 Rust 双 target + `lipo` + xcodebuild `ARCHS="arm64 x86_64"` 交叉编译。
+- 步骤：校验 `tag == vVERSION` → 选最新 Xcode + 断言 Swift ≥ 6.2 → rustup stable → `package.sh universal` → ad-hoc 签名 → `ditto` 打 zip → `gh release create`。
+- 产物（Universal arm64+x86_64）：`jj-bookmark-macos-universal.zip`（.app）、`jj-bookmark-cli-macos-universal`（CLI）、`SHA256SUMS.txt`。
 - notes：CHANGELOG 本版段 + `.github/release-notes-footer.md`（含 quarantine 移除说明）。
 - 未签名/未公证 → 用户首次运行需 `xattr -dr com.apple.quarantine <path>`。
 
@@ -103,4 +99,4 @@ git push origin vX.Y.Z
 - secrets（人类在仓库配置）：`CLOUDFLARE_API_TOKEN`（Workers + R2 权限）、`CLOUDFLARE_ACCOUNT_ID`。
 - 前置（人类在 Cloudflare 侧）：建 R2 bucket `jj-bookmark`；配 Access（Google IdP）网关 Worker 域名。详见 [jj-bookmark-web/README.md](./jj-bookmark-web/README.md)。
 
-> 数据含内网 URL。Worker 校验 Access JWT（`wrangler.toml [vars]` 的 team domain/AUD），无有效 token 一律 403（含 `*.workers.dev` 直连）；R2 对象缺失只返回空库。故 deploy 后不裸奔。secrets/bucket 未就绪时 deploy GHA 失败即空转，无副作用。
+> 数据含内网 URL。Worker 校验 Access JWT（`wrangler.toml [vars]` 的 team domain/AUD），无有效 token 一律 403；`wrangler.toml` 已 `workers_dev = false` + `preview_urls = false`，`*.workers.dev` 生产与 preview 域均关闭，仅自定义域 `jj-bookmark.yigegongjiang.com` 可达。R2 对象缺失只返回空库，故 deploy 后不裸奔。secrets/bucket 未就绪时 deploy GHA 失败即空转，无副作用。

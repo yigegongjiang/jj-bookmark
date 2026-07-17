@@ -11,6 +11,16 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.10.0] - 2026-07-17
+
+### Added
+
+- macOS 通用版：一份安装包同时支持 Apple Silicon 与 Intel Mac
+
+### Security
+
+- 关闭 `*.workers.dev` 网页域名（含 Public 预览域），仅经自定义域访问
+
 ## [0.9.0] - 2026-07-17
 
 ### Added
@@ -97,6 +107,7 @@
 - App 三栏浏览 + 文件夹树 + 即时搜索；终端改动后无需重启即刷新
 - 查询：内嵌 jq 引擎的 `--filter`，数据文件也可直接用 `jq` 处理
 
+[0.10.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.10.0
 [0.9.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.9.0
 [0.2.0]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.2.0
 [0.1.2]: https://github.com/yigegongjiang/jj-bookmark/releases/tag/v0.1.2

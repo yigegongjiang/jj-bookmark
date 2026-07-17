@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 本机发布：打 release 包 → 拷贝到 /Applications。
+# 本机发布：按本机架构打 Release 包 → 拷贝到 /Applications。
 # 本机自建 .app 无 quarantine 属性，Gatekeeper 不校验签名，直接可跑（无需签名/公证）。
 # 用法: ./install-local.sh
 set -euo pipefail
@@ -9,8 +9,8 @@ SRC="$ROOT/jj-bookmark-app/build/jj-bookmark.app"
 DEST="/Applications/jj-bookmark.app"
 VERSION="$(tr -d ' \t\n\r' < "$ROOT/VERSION")"
 
-echo "==> [1/2] 打 release 包"
-"$ROOT/jj-bookmark-app/package.sh" release
+echo "==> [1/2] 打包 (host: $(uname -m) Release)"
+"$ROOT/jj-bookmark-app/package.sh"    # 默认 host，仅本机架构；universal 留给 CI
 
 echo "==> [2/2] 安装到 /Applications"
 # 关掉可能在跑的旧实例，否则占用二进制导致拷贝/运行异常

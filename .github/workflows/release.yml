@@ -1,8 +1,9 @@
 name: release
 
-# push tag vX.Y.Z 触发：打包 macOS App + CLI，创建 GitHub Release。
+# push tag vX.Y.Z 触发：打包 macOS App + CLI（Universal arm64+x86_64），创建 GitHub Release。
 # runner 必须为 macos-26：项目用 .defaultIsolation(Swift 6.2)，仅 Xcode 26+ 可编译；
-# macos-15 仅带 Xcode 16.x。arm64 原生构建，产物即 arm64（未做 universal，见 workflow.md）。
+# macos-15 仅带 Xcode 16.x。runner 本身 arm64，通过 Rust 双 target + lipo + xcodebuild ARCHS
+# 在同一 runner 上交叉编译 x86_64 slice（Xcode SDK 自带 x86 支持）。
 on:
   push:
     tags:
@@ -33,14 +34,14 @@ jobs:
             echo "需要 Swift ≥ 6.2，实际 $sw（runner 镜像回退？换更新的 macos-* label）" >&2; exit 1
           fi
 
-      - name: 准备 Rust stable（edition 2024 需 ≥ 1.85）
+      - name: 准备 Rust stable（edition 2024 需 ≥ 1.85；universal target 由 package.sh 自动 add）
         run: |
           rustup update stable
           rustup default stable
           rustc --version
 
-      - name: 打包 .app（内嵌同版本 CLI）
-        run: ./jj-bookmark-app/package.sh release
+      - name: 打包 .app（Release universal arm64+x86_64，内嵌同版本 CLI）
+        run: ./jj-bookmark-app/package.sh universal
 
       - name: ad-hoc 签名（无 Developer 证书；封装 bundle）
         run: |
@@ -49,13 +50,13 @@ jobs:
           codesign --force --deep --sign - "$app"
           codesign --verify "$app"
 
-      - name: 组装发布产物（arm64）
+      - name: 组装发布产物（universal）
         run: |
           mkdir -p dist
           app="jj-bookmark-app/build/jj-bookmark.app"
-          ditto -c -k --keepParent "$app" "dist/jj-bookmark-macos-arm64.zip" # 保 bundle 结构/签名
-          cp jj-bookmark-cli/target/release/jj-bookmark "dist/jj-bookmark-cli-macos-arm64"
-          ( cd dist && shasum -a 256 jj-bookmark-macos-arm64.zip jj-bookmark-cli-macos-arm64 > SHA256SUMS.txt )
+          ditto -c -k --keepParent "$app" "dist/jj-bookmark-macos-universal.zip"      # 保 bundle 结构/签名
+          cp "$app/Contents/Helpers/jj-bookmark" "dist/jj-bookmark-cli-macos-universal" # bundle 内已 lipo 合并 arm64+x86_64
+          ( cd dist && shasum -a 256 jj-bookmark-macos-universal.zip jj-bookmark-cli-macos-universal > SHA256SUMS.txt )
 
       - name: 生成 Release notes（CHANGELOG 本版段 + 安装说明 footer）
         run: |
@@ -76,6 +77,6 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --notes-file notes.md \
-            dist/jj-bookmark-macos-arm64.zip \
-            dist/jj-bookmark-cli-macos-arm64 \
+            dist/jj-bookmark-macos-universal.zip \
+            dist/jj-bookmark-cli-macos-universal \
             dist/SHA256SUMS.txt

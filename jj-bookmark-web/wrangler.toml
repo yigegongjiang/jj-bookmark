@@ -5,6 +5,11 @@ name = "jj-bookmark"
 main = "src/index.js"
 compatibility_date = "2026-07-17"
 
+# 关闭 workers.dev 域（production + preview）——已启用自定义域 `jj-bookmark.yigegongjiang.com`；
+# preview URL `*-jj-bookmark.<subdomain>.workers.dev` 默认 Public，即使 Worker 有 JWT 校验也一并关，减少攻击面。
+workers_dev = false
+preview_urls = false
+
 # 静态资源（preview page）。run_worker_first=true → 所有请求先进 Worker（含静态资源），
 # 由 Worker 统一做 Access JWT 校验后再经 env.ASSETS.fetch() 返回，确保页面也不裸奔。
 [assets]

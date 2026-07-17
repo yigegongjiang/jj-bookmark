@@ -7,6 +7,13 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.10.0] - 2026-07-17
+
+- macOS 通用版：一份安装包同时支持 Apple Silicon 与 Intel Mac
+  - `jj-bookmark-app/package.sh` 重写为 `[host|universal]` 双模式恒 Release：host=按 `uname -m` 单架构（`install-local.sh` 用）；universal=Rust `rustup target add aarch64-apple-darwin x86_64-apple-darwin` 双 target build + `lipo -create` 合并 CLI + xcodebuild `-destination 'generic/platform=macOS' ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO`（CI 用）；`release.yml` 改跑 `package.sh universal`，产物 `jj-bookmark-macos-universal.zip` / `jj-bookmark-cli-macos-universal`（后者直接从 bundle `Contents/Helpers/jj-bookmark` 拷贝，已 lipo 合并）；脚本末尾 `lipo -archs` 打印双 slice 校核；同时移除脚本 `[release|debug]` 分支恒 Release（本地调试用 `swift build` / `cargo run`）
+- 关闭 `*.workers.dev` 网页域名（含 Public 预览域），仅经自定义域访问
+  - `jj-bookmark-web/wrangler.toml` 加 `workers_dev = false` + `preview_urls = false`（已上自定义域 `jj-bookmark.yigegongjiang.com`；即使 Worker 侧 JWT 校验存在也一并关，缩小攻击面）；同步 `jj-bookmark-web/README.md` + `workflow.md` 里 *.workers.dev 相关措辞
+
 ## [0.9.0] - 2026-07-17
 
 - 新增 `jj-bookmark push`：把本地书签单向同步到网页版，浏览器里随处只读查看

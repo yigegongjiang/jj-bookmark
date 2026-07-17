@@ -7,7 +7,8 @@
 - `src/index.js` — Worker：`/api/bookmarks` 读 R2（缺失兜底空库），其余路由走静态资源。
 - `public/index.html` — 单文件 SPA（内联 CSS/JS）：拉 `/api/bookmarks` 后内存过滤 / 排序，无构建步骤。
 - `wrangler.toml` — R2 绑定 `BOOKMARKS`（bucket `jj-bookmark`）+ 静态资源 `ASSETS`（`run_worker_first`）+ Access 参数 `vars`。
-- 认证 = 双层：① Cloudflare Access（Google IdP）在**边缘**按登录网关；② Worker 再校验 Access 注入的 JWT（`Cf-Access-Jwt-Assertion`：RS256 签名 + `iss`/`aud`/`exp`），堵住绕过边缘（如直连 `*.workers.dev`）的口子。`run_worker_first` 令页面与 API 都经此校验。`CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` 缺任一则跳过 ②（本地 dev / 未配场景）。
+- 认证 = 双层：① Cloudflare Access（Google IdP）在**边缘**按登录网关；② Worker 再校验 Access 注入的 JWT（`Cf-Access-Jwt-Assertion`：RS256 签名 + `iss`/`aud`/`exp`），堵住绕过边缘的口子。`run_worker_first` 令页面与 API 都经此校验。`CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` 缺任一则跳过 ②（本地 dev / 未配场景）。
+- 域接入 = 仅自定义域（`jj-bookmark.yigegongjiang.com`）；`wrangler.toml` 里 `workers_dev = false` + `preview_urls = false` 关闭 `*.workers.dev` 生产与 preview 域，进一步缩小攻击面。
 
 ## 前置（人类在 Cloudflare 侧一次性配置）
 
@@ -15,7 +16,7 @@
 2. 配 Access：Zero Trust → Access → Applications，为本 Worker 域名建 self-hosted 应用，IdP 选 Google，策略限定允许的邮箱 / 域。应用的 team domain 与 AUD tag 已写入 `wrangler.toml` `[vars]`（Worker 据此校验 JWT）；换应用 / 账号时同步更新这两个值。
 3. 配 GHA secrets（仓库 Settings → Secrets）：`CLOUDFLARE_API_TOKEN`（含 Workers + R2 编辑权限）、`CLOUDFLARE_ACCOUNT_ID`。
 
-> 数据含内网 URL。Worker 自身校验 Access JWT，未带有效 token 一律 403（含 `*.workers.dev` 直连），故 deploy 后即使边缘 Access 尚未覆盖某路由也不裸奔；R2 对象缺失时更只返回空库。仍 SHOULD 保持 Access 应用 + 策略在位（首要网关 + 提供 JWT）。
+> 数据含内网 URL。Worker 自身校验 Access JWT，未带有效 token 一律 403；`workers.dev` 生产 + preview 域已在 `wrangler.toml` 关闭，仅自定义域可达。deploy 后即使边缘 Access 尚未覆盖某路由也不裸奔；R2 对象缺失时更只返回空库。仍 SHOULD 保持 Access 应用 + 策略在位（首要网关 + 提供 JWT）。
 
 ## 调试（本地，无需云端登录）
 

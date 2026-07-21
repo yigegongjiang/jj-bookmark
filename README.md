@@ -33,3 +33,4 @@
 - `jj-bookmark-cli/` — Rust CLI（cargo），产物二进制 `jj-bookmark`（唯一核心）
 - `jj-bookmark-app/` — macOS App（Swift + AppKit，SwiftPM）+ `package.sh`（组装 `.app`、内嵌 CLI）
 - `jj-bookmark-web/` — Cloudflare Worker（JS）+ 静态只读 preview page + R2 绑定；`push` 目标 + web 部署（GHA）
+- `raycast/` — Raycast extension（TS，dev-only，NEVER 上架）：query + open，经 CLI `ls --json` / `open`；详见 [raycast/README.md](./raycast/README.md)

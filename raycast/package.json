@@ -1,0 +1,46 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "jj-bookmark",
+  "title": "jj-bookmark",
+  "description": "Search and open your jj-bookmark bookmarks",
+  "icon": "icon.png",
+  "author": "hailv",
+  "license": "MIT",
+  "platforms": [
+    "macOS"
+  ],
+  "categories": [
+    "Productivity",
+    "Web"
+  ],
+  "commands": [
+    {
+      "name": "search-bookmarks",
+      "title": "Search Bookmarks",
+      "subtitle": "jj-bookmark",
+      "description": "Search bookmarks (all sources) and open them in the default browser",
+      "mode": "view"
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.104.23",
+    "@raycast/utils": "^2.2.7"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.2.0",
+    "@types/node": "^22.13.10",
+    "@types/react": "^19.0.10",
+    "eslint": "^9.22.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.9.2"
+  },
+  "scripts": {
+    "build": "ray build",
+    "dev": "ray develop",
+    "lint": "ray lint",
+    "fix-lint": "ray lint --fix"
+  },
+  "allowScripts": {
+    "esbuild@0.27.7": true
+  }
+}

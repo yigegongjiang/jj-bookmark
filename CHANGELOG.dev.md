@@ -7,6 +7,12 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.14.0] - 2026-07-21
+
+- 新增 Raycast 扩展（本地开发用，不含在发布包内）：在 Raycast 里搜索 / 打开书签
+  - `raycast/`（TS + @raycast/api）：`useExec` 调 CLI `ls --all --json` load-once + 内存 keyword 过滤（复刻 query.rs），`open` 走 CLI `open <id>`
+  - 列表行改版：title=标题、subtitle=URL（原为 folder）、folder / source / favorite / 最近访问置右侧 accessory
+
 ## [0.13.1] - 2026-07-21
 
 - App 打开书签后自动隐藏窗口，切至浏览器无需手动切走

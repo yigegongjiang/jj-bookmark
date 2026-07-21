@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.14.0] - 2026-07-21
+
+### Added
+
+- 新增 Raycast 扩展（本地开发用，不含在发布包内）：在 Raycast 里搜索 / 打开书签
+
 ## [0.13.1] - 2026-07-21
 
 ### Changed

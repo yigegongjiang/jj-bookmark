@@ -14,7 +14,7 @@
   - 强制点 = CLI `apply`（`cmd_add` 新增、`cmd_edit` 换 source/folder 时）+ `cmd_mv`（前缀替换后校验每个落点 folder）；违反即 `bail!` 非零退出、`mutate` 不写入
   - targeted 校验：仅在放置 / 移动 folder 时触发，纯字段编辑与既有脏数据不追溯（无历史迁移）
 - 未分类书签（`folder == ""`）不受此约束，可照常保存
-  - `ensure_leaf_placement` 空 folder 直接放行（策略 A，可一行翻转为「必须有 folder」）
+  - `ensure_leaf_placement` 空 folder 直接放行（策略 A）；翻转为策略 B（必须有 folder）须新增对空 folder 的显式 `bail!`（删 guard 行为无变化，空串已被 `is_ancestor` 短路恒放行）
   - App `newBookmark` 仅在选中叶子 folder 节点时预填其路径（`children.isEmpty`），避免预填非叶路径被 CLI 拒绝
 
 ## [0.12.0] - 2026-07-17

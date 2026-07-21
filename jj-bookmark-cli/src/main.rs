@@ -629,7 +629,8 @@ fn is_ancestor(ancestor: &str, descendant: &str) -> bool {
 /// `existing` = 同 source 内其他书签的 folder 路径。空 `folder`（未分类）恒允许。
 fn ensure_leaf_placement<'a>(folder: &str, existing: impl Iterator<Item = &'a str>) -> Result<()> {
     if folder.is_empty() {
-        return Ok(()); // 未分类不受叶子约束（策略 A；改为「必须有 folder」只需删本行）
+        return Ok(()); // 未分类不受叶子约束（策略 A）。注：删本行不改行为——空串亦被 is_ancestor
+        // 短路而恒放行；改为策略 B（必须有 folder）须在此新增对空 folder 的显式 bail!。
     }
     for other in existing {
         if other.is_empty() || other == folder {

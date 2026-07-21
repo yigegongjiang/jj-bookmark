@@ -25,7 +25,7 @@ use store::{Paths, mutate, read_store};
     version,
     about = "Bookmark tool",
     disable_help_subcommand = true,
-    before_help = "TL;DR — save a bookmark:\n  1. Use the default source; inspect its folder paths first: jj-bookmark folders\n  2. Choose the closest existing folder; infer a concise title and other useful metadata.\n  3. jj-bookmark apply <URL> --title <TITLE> --folder <PATH> [--note <NOTE>] [--excerpt <TEXT>] [--fetch]\n  Edit: apply <ID> <fields>; delete: apply <ID> --delete."
+    before_help = "TL;DR — save a bookmark:\n  1. Search: jj-bookmark --all query <DOMAIN>; same domain = strong match; ask: add or edit <ID>?\n  2. Pick the closest path from jj-bookmark folders; infer title and useful metadata.\n  3. jj-bookmark apply <URL> --title <TITLE> --folder <PATH> [--note <NOTE>] [--excerpt <TEXT>] [--fetch]\n  Edit: jj-bookmark --all apply <ID> <fields>; delete: jj-bookmark --all apply <ID> --delete."
 )]
 struct Cli {
     #[command(flatten)]

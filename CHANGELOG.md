@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.14.1] - 2026-07-21
+
+### Changed
+
+- CLI 保存指引先按 URL 域名检查已有书签；同域命中时先选择新增或编辑
+
 ## [0.14.0] - 2026-07-21
 
 ### Added

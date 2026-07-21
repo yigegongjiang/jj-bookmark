@@ -7,6 +7,11 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.14.1] - 2026-07-21
+
+- CLI 保存指引先按 URL 域名检查已有书签；同域命中时先选择新增或编辑
+  - `--help` TL;DR 先执行 `--all query <DOMAIN>`；不暴露默认 source
+
 ## [0.14.0] - 2026-07-21
 
 - 新增 Raycast 扩展（本地开发用，不含在发布包内）：在 Raycast 里搜索 / 打开书签

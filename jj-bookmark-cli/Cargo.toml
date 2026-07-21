@@ -1,6 +1,6 @@
 [package]
 name = "jj-bookmark-cli"
-version = "0.13.0"
+version = "0.13.1"
 edition = "2024"
 
 # 二进制名固定为 jj-bookmark（crate 目录名带 -cli 后缀以区分工程）。

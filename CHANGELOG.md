@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.13.1] - 2026-07-21
+
+### Changed
+
+- App 打开书签后自动隐藏窗口，切至浏览器无需手动切走
+
 ## [0.13.0] - 2026-07-21
 
 ### Changed

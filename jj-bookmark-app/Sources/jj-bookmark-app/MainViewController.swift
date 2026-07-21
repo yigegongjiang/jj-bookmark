@@ -472,7 +472,13 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
     @objc func openSelected() {
         let bms = targetBookmarks()
         guard !bms.isEmpty else { return }
-        performWrite { for b in bms { try runner.open(id: b.id) } }
+        do {
+            for b in bms { try runner.open(id: b.id) }
+            reload()
+            NSApp.hide(nil)
+        } catch {
+            showError(error, title: L10n.errorOperationFailed)
+        }
     }
 
     @objc func focusSearch() {

@@ -7,6 +7,11 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.13.1] - 2026-07-21
+
+- App 打开书签后自动隐藏窗口，切至浏览器无需手动切走
+  - `MainViewController.openSelected` 成功打开后调用 `NSApp.hide(nil)`；失败弹错时不隐藏
+
 ## [0.13.0] - 2026-07-21
 
 - 书签只能挂到叶子文件夹：路径 `a / b / c` 只能挂 `c`，不能挂 `a` / `b`；挂到非叶文件夹时保存 / 移动会被拒绝

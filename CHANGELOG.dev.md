@@ -7,6 +7,16 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.13.0] - 2026-07-21
+
+- 书签只能挂到叶子文件夹：路径 `a / b / c` 只能挂 `c`，不能挂 `a` / `b`；挂到非叶文件夹时保存 / 移动会被拒绝
+  - 约束语义：同一 source 内被占用的非空 `folder` 路径构成 antichain（无占用路径是另一占用路径的严格前缀祖先，分隔符 `" / "`）；单点校验 `ensure_leaf_placement`（`main.rs`）
+  - 强制点 = CLI `apply`（`cmd_add` 新增、`cmd_edit` 换 source/folder 时）+ `cmd_mv`（前缀替换后校验每个落点 folder）；违反即 `bail!` 非零退出、`mutate` 不写入
+  - targeted 校验：仅在放置 / 移动 folder 时触发，纯字段编辑与既有脏数据不追溯（无历史迁移）
+- 未分类书签（`folder == ""`）不受此约束，可照常保存
+  - `ensure_leaf_placement` 空 folder 直接放行（策略 A，可一行翻转为「必须有 folder」）
+  - App `newBookmark` 仅在选中叶子 folder 节点时预填其路径（`children.isEmpty`），避免预填非叶路径被 CLI 拒绝
+
 ## [0.12.0] - 2026-07-17
 
 - CLI 用 `apply <URL|ID>` 统一新增 / 编辑，`apply <ID> --delete` 删除；`--source` / `--all` 仅为根选项

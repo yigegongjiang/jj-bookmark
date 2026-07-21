@@ -407,7 +407,11 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
     // MARK: - 编辑动作（全部经 CLI，写后自刷新；FSEvents 亦会合并触发）
 
     @objc func newBookmark() {
-        let folderDefault = selectedFolder?.kind == .normal ? (selectedFolder?.path ?? "") : ""
+        // 只在选中的是叶子 folder（无子节点）时预填其路径：书签只能挂叶子，
+        // 预填非叶路径会被 CLI 拒绝。非叶 / 非 folder 节点留空由用户填。
+        let sel = selectedFolder
+        let folderDefault = (sel?.kind == .normal && sel?.children.isEmpty == true)
+            ? (sel?.path ?? "") : ""
         let source = selectedFolder?.source ?? "default"
         guard let v = runForm(title: L10n.formNewTitle, okTitle: L10n.btnAdd, fields: [
             ("URL", "", "https://…"),

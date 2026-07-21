@@ -11,6 +11,13 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.13.0] - 2026-07-21
+
+### Changed
+
+- 书签只能挂到叶子文件夹：路径 `a / b / c` 只能挂 `c`，不能挂 `a` / `b`；挂到非叶文件夹时保存 / 移动会被拒绝
+- 未分类书签（不填文件夹）不受此约束，可照常保存
+
 ## [0.12.0] - 2026-07-17
 
 ### Changed

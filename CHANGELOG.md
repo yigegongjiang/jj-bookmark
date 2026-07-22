@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.15.0] - 2026-07-22
+
+### Changed
+
+- folder 层级分隔符由 `A / B`（空格斜杠）改为 `A::B`（无空格），避免 AI 保存时丢空格致层级错位；本机数据已自动迁移
+
 ## [0.14.1] - 2026-07-21
 
 ### Changed

@@ -7,6 +7,14 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.15.0] - 2026-07-22
+
+- folder 层级分隔符由 `A / B`（空格斜杠）改为 `A::B`（无空格），避免 AI 保存时丢空格致层级错位；本机数据已自动迁移
+  - 单点常量 `"::"`：CLI `model::FOLDER_SEP` / App `folderSep` / web `FOLDER_SEP`
+  - 改造点：`query::folder_filter`、`is_ancestor`、`cmd_mv` 前缀拼接、Swift `FolderTree` split/join + hasPrefix、web `buildTree`/`subtreeCount`/子树过滤
+  - AI-facing 文本：`--help` before_help + `apply --folder` 说明显式声明 `::`
+  - 本机 `bookmarks.json` 经 jq `gsub(" / "; "::")` 一次性迁移（1227 folder），无 load 时兼容逻辑
+
 ## [0.14.1] - 2026-07-21
 
 - CLI 保存指引先按 URL 域名检查已有书签；同域命中时先选择新增或编辑

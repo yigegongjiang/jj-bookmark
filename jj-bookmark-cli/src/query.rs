@@ -1,7 +1,7 @@
 //! 排序与关键词过滤（data-model §10）。四个固定排序键与关键词模糊搜均为原生比较，
 //! 不经 jq 引擎（jaq 仅服务 `--filter`，见 filter.rs）。
 
-use crate::model::Bookmark;
+use crate::model::{Bookmark, FOLDER_SEP};
 use clap::ValueEnum;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
@@ -68,9 +68,9 @@ pub fn keyword_filter(bms: Vec<Bookmark>, keyword: &str) -> Vec<Bookmark> {
         .collect()
 }
 
-/// folder 子树过滤：命中该 folder 本身或其后代（前缀 + " / "）。
+/// folder 子树过滤：命中该 folder 本身或其后代（前缀 + `FOLDER_SEP`）。
 pub fn folder_filter(bms: Vec<Bookmark>, folder: &str) -> Vec<Bookmark> {
-    let prefix = format!("{folder} / ");
+    let prefix = format!("{folder}{FOLDER_SEP}");
     bms.into_iter()
         .filter(|b| b.folder == folder || b.folder.starts_with(&prefix))
         .collect()
@@ -134,7 +134,7 @@ mod tests {
     fn keyword_matches_note_folder_and_tags() {
         let mut matching = bm(1, 0, 0, "Reference");
         matching.note = "Rust ownership".into();
-        matching.folder = "Work / Backend".into();
+        matching.folder = "Work::Backend".into();
         matching.tags = vec!["language".into()];
 
         let out = keyword_filter(vec![matching], "rust backend language");
@@ -147,7 +147,7 @@ mod tests {
         let mut a = bm(1, 0, 0, "a");
         a.folder = "Work".into();
         let mut b = bm(2, 0, 0, "b");
-        b.folder = "Work / Docs".into();
+        b.folder = "Work::Docs".into();
         let mut c = bm(3, 0, 0, "c");
         c.folder = "Tools".into();
         let out = folder_filter(vec![a, b, c], "Work");

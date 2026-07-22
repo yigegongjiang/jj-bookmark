@@ -8,6 +8,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const CURRENT_VERSION: u32 = 3;
 pub const DEFAULT_SOURCE: &str = "default";
+/// folder 层级分隔符：无空格，避免 AI 写路径时被空格挤压致格式漂移。段名不得含此串。
+pub const FOLDER_SEP: &str = "::";
 
 fn default_source() -> String {
     DEFAULT_SOURCE.to_owned()

@@ -416,7 +416,7 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
         guard let v = runForm(title: L10n.formNewTitle, okTitle: L10n.btnAdd, fields: [
             ("URL", "", "https://…"),
             (L10n.fieldTitle, "", L10n.placeholderTitleHint),
-            (L10n.fieldFolder, folderDefault, "A / B"),
+            (L10n.fieldFolder, folderDefault, "A::B"),
         ]) else { return }
         let url = v[0].trimmingCharacters(in: .whitespacesAndNewlines)
         guard !url.isEmpty else { return }
@@ -492,7 +492,7 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
     @objc private func renameSelectedFolder() {
         guard let node = clickedFolder(), node.kind == .normal, let source = node.source else { return }
         guard let v = runForm(title: L10n.formRenameTitle, okTitle: L10n.btnRename, fields: [
-            (L10n.fieldNewPath, node.path, "A / B"),
+            (L10n.fieldNewPath, node.path, "A::B"),
         ]) else { return }
         let newPath = v[0].trimmingCharacters(in: .whitespacesAndNewlines)
         guard !newPath.isEmpty, newPath != node.path else { return }

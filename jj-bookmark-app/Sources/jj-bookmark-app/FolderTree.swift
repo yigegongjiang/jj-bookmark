@@ -1,5 +1,8 @@
 import Foundation
 
+// folder 层级分隔符：无空格，与 CLI 的 FOLDER_SEP 保持一致（data-model §5）。
+let folderSep = "::"
+
 // source 是第一层，folder 是 source 内部层级；path 永远只保存真实 folder 路径。
 final class FolderNode {
     enum Kind { case all, source, normal, uncategorized }
@@ -39,7 +42,7 @@ final class FolderNode {
             return bookmark.source == source && bookmark.folder.isEmpty
         case .normal:
             return bookmark.source == source
-                && (bookmark.folder == path || bookmark.folder.hasPrefix(path + " / "))
+                && (bookmark.folder == path || bookmark.folder.hasPrefix(path + folderSep))
         }
     }
 }
@@ -75,7 +78,7 @@ enum FolderTree {
         var nodes: [String: FolderNode] = [:]
         func ensure(_ path: String) -> FolderNode {
             if let node = nodes[path] { return node }
-            let name = path.components(separatedBy: " / ").last ?? path
+            let name = path.components(separatedBy: folderSep).last ?? path
             let node = FolderNode(kind: .normal, name: name, source: source, path: path)
             nodes[path] = node
             return node
@@ -85,8 +88,8 @@ enum FolderTree {
         for fullPath in direct.keys {
             var prefix = ""
             var parent: FolderNode?
-            for (index, part) in fullPath.components(separatedBy: " / ").enumerated() {
-                prefix = index == 0 ? part : prefix + " / " + part
+            for (index, part) in fullPath.components(separatedBy: folderSep).enumerated() {
+                prefix = index == 0 ? part : prefix + folderSep + part
                 let node = ensure(prefix)
                 if let parent {
                     if !parent.children.contains(where: { $0.path == node.path }) {

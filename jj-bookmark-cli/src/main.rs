@@ -15,7 +15,7 @@ use clap::{Args, Parser, Subcommand};
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use model::{Bookmark, CURRENT_VERSION, DEFAULT_SOURCE, Store, now_millis};
+use model::{Bookmark, CURRENT_VERSION, DEFAULT_SOURCE, FOLDER_SEP, Store, now_millis};
 use query::{Order, SortKey};
 use store::{Paths, mutate, read_store};
 
@@ -25,7 +25,7 @@ use store::{Paths, mutate, read_store};
     version,
     about = "Bookmark tool",
     disable_help_subcommand = true,
-    before_help = "TL;DR — save a bookmark:\n  1. Search: jj-bookmark --all query <DOMAIN>; same domain = strong match; ask: add or edit <ID>?\n  2. Pick the closest path from jj-bookmark folders; infer title and useful metadata.\n  3. jj-bookmark apply <URL> --title <TITLE> --folder <PATH> [--note <NOTE>] [--excerpt <TEXT>] [--fetch]\n  Edit: jj-bookmark --all apply <ID> <fields>; delete: jj-bookmark --all apply <ID> --delete."
+    before_help = "TL;DR — save a bookmark:\n  1. Search: jj-bookmark --all query <DOMAIN>; same domain = strong match; ask: add or edit <ID>?\n  2. Pick the closest path from jj-bookmark folders; levels are joined by `::` with no spaces (e.g. AI::claude-code); infer title and useful metadata.\n  3. jj-bookmark apply <URL> --title <TITLE> --folder <PATH> [--note <NOTE>] [--excerpt <TEXT>] [--fetch]\n  Edit: jj-bookmark --all apply <ID> <fields>; delete: jj-bookmark --all apply <ID> --delete."
 )]
 struct Cli {
     #[command(flatten)]
@@ -99,6 +99,7 @@ enum Command {
         title: Option<String>,
         #[arg(long)]
         url: Option<String>,
+        /// Folder path; nest levels with `::` and no spaces (e.g. AI::claude-code)
         #[arg(long)]
         folder: Option<String>,
         #[arg(long)]
@@ -551,7 +552,7 @@ fn cmd_rm(paths: &Paths, id: i64, scope: Scope) -> Result<()> {
 
 fn cmd_mv(paths: &Paths, old: String, new: String, scope: Scope) -> Result<()> {
     let n = mutate(paths, |store| {
-        let prefix = format!("{old} / ");
+        let prefix = format!("{old}{FOLDER_SEP}");
         let now = now_millis();
         let mut moved = 0;
         for (source, bookmarks) in &mut store.sources {
@@ -563,7 +564,7 @@ fn cmd_mv(paths: &Paths, old: String, new: String, scope: Scope) -> Result<()> {
                 let new_folder = if bookmark.folder == old {
                     new.clone()
                 } else if let Some(rest) = bookmark.folder.strip_prefix(&prefix) {
-                    format!("{new} / {rest}")
+                    format!("{new}{FOLDER_SEP}{rest}")
                 } else {
                     continue;
                 };
@@ -619,9 +620,9 @@ fn source_for_id(store: &Store, id: i64, scope: &Scope) -> Option<String> {
     })
 }
 
-/// `ancestor` 是否为 `descendant` 的严格前缀祖先（按 " / " 分段）。空路径不作祖先（未分类豁免）。
+/// `ancestor` 是否为 `descendant` 的严格前缀祖先（按 `FOLDER_SEP` 分段）。空路径不作祖先（未分类豁免）。
 fn is_ancestor(ancestor: &str, descendant: &str) -> bool {
-    !ancestor.is_empty() && descendant.starts_with(&format!("{ancestor} / "))
+    !ancestor.is_empty() && descendant.starts_with(&format!("{ancestor}{FOLDER_SEP}"))
 }
 
 /// 叶子挂载约束：书签只能挂到叶子 folder。校验把书签挂到 `folder` 是否与同 source 内
@@ -819,7 +820,7 @@ mod tests {
     #[test]
     fn leaf_add_rejects_ancestor_and_descendant_allows_sibling_dup_and_uncategorized() {
         let paths = temp_paths("leaf-add");
-        seed(&paths, DEFAULT_SOURCE, 1, "A / B / C"); // 现有叶子
+        seed(&paths, DEFAULT_SOURCE, 1, "A::B::C"); // 现有叶子
 
         let add = |folder: Option<&str>| {
             cmd_add(
@@ -833,14 +834,14 @@ mod tests {
                 default_scope(),
             )
         };
-        // 挂到祖先 A / B → 拒绝
-        assert!(add(Some("A / B")).is_err());
-        // 挂到后代 A / B / C / D（会使 A/B/C 非叶）→ 拒绝
-        assert!(add(Some("A / B / C / D")).is_err());
-        // 兄弟叶子 A / B / E → 允许
-        assert!(add(Some("A / B / E")).is_ok());
+        // 挂到祖先 A::B → 拒绝
+        assert!(add(Some("A::B")).is_err());
+        // 挂到后代 A::B::C::D（会使 A::B::C 非叶）→ 拒绝
+        assert!(add(Some("A::B::C::D")).is_err());
+        // 兄弟叶子 A::B::E → 允许
+        assert!(add(Some("A::B::E")).is_ok());
         // 同叶子再加一条 → 允许
-        assert!(add(Some("A / B / C")).is_ok());
+        assert!(add(Some("A::B::C")).is_ok());
         // 未分类（空 folder）即使已有 folder 也允许（空 folder 豁免，策略 A）
         assert!(add(None).is_ok());
         let _ = fs::remove_dir_all(&paths.dir);
@@ -849,7 +850,7 @@ mod tests {
     #[test]
     fn leaf_edit_rejects_non_leaf_but_allows_field_edit_on_dirty_folder() {
         let paths = temp_paths("leaf-edit");
-        seed(&paths, DEFAULT_SOURCE, 1, "X / Y");
+        seed(&paths, DEFAULT_SOURCE, 1, "X::Y");
         seed(&paths, DEFAULT_SOURCE, 2, "Z");
 
         let set_folder = |id: i64, folder: &str| {
@@ -865,14 +866,14 @@ mod tests {
                 default_scope(),
             )
         };
-        // #2 → X（X 是 X/Y 的祖先，会非叶）→ 拒绝
+        // #2 → X（X 是 X::Y 的祖先，会非叶）→ 拒绝
         assert!(set_folder(2, "X").is_err());
-        // #2 → 兄弟叶子 X / K → 允许
-        assert!(set_folder(2, "X / K").is_ok());
+        // #2 → 兄弟叶子 X::K → 允许
+        assert!(set_folder(2, "X::K").is_ok());
 
-        // 脏放置：P 与 P/Q 同时占用（绕过校验直接塞）
+        // 脏放置：P 与 P::Q 同时占用（绕过校验直接塞）
         seed(&paths, DEFAULT_SOURCE, 3, "P");
-        seed(&paths, DEFAULT_SOURCE, 4, "P / Q");
+        seed(&paths, DEFAULT_SOURCE, 4, "P::Q");
         // 仅改 #3 title（folder 不变）→ 允许（不追溯既有脏数据）
         assert!(
             cmd_edit(
@@ -895,8 +896,8 @@ mod tests {
     fn leaf_cross_source_move_into_conflict_is_rejected() {
         let paths = temp_paths("leaf-xsrc");
         seed(&paths, "safari", 1, "A"); // 待移动，folder=A
-        seed(&paths, DEFAULT_SOURCE, 2, "A / B"); // 目标 source 已有 A/B
-        // #1 safari→default（folder 保持 A）→ default 里 A 成 A/B 祖先 → 拒绝
+        seed(&paths, DEFAULT_SOURCE, 2, "A::B"); // 目标 source 已有 A::B
+        // #1 safari→default（folder 保持 A）→ default 里 A 成 A::B 祖先 → 拒绝
         assert!(
             cmd_edit(
                 &paths,
@@ -917,17 +918,17 @@ mod tests {
     #[test]
     fn leaf_mv_merge_into_leaf_ok_but_into_ancestor_rejected() {
         let paths = temp_paths("leaf-mv-ok");
-        seed(&paths, DEFAULT_SOURCE, 1, "A / B");
-        seed(&paths, DEFAULT_SOURCE, 2, "A / C");
-        // mv A/B → A/C：合并到同一叶子 → 允许
-        assert!(cmd_mv(&paths, "A / B".into(), "A / C".into(), default_scope()).is_ok());
+        seed(&paths, DEFAULT_SOURCE, 1, "A::B");
+        seed(&paths, DEFAULT_SOURCE, 2, "A::C");
+        // mv A::B → A::C：合并到同一叶子 → 允许
+        assert!(cmd_mv(&paths, "A::B".into(), "A::C".into(), default_scope()).is_ok());
         let _ = fs::remove_dir_all(&paths.dir);
 
         let paths = temp_paths("leaf-mv-bad");
-        seed(&paths, DEFAULT_SOURCE, 1, "A / B");
+        seed(&paths, DEFAULT_SOURCE, 1, "A::B");
         seed(&paths, DEFAULT_SOURCE, 2, "C");
-        // mv A/B → C/D：C 已占用且会成 C/D 祖先 → 拒绝
-        assert!(cmd_mv(&paths, "A / B".into(), "C / D".into(), default_scope()).is_err());
+        // mv A::B → C::D：C 已占用且会成 C::D 祖先 → 拒绝
+        assert!(cmd_mv(&paths, "A::B".into(), "C::D".into(), default_scope()).is_err());
         let _ = fs::remove_dir_all(&paths.dir);
     }
 }

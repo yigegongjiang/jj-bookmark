@@ -147,6 +147,7 @@
 
     <script>
       // ---- 状态 ----
+      const FOLDER_SEP = "::"; // folder 层级分隔符，与 CLI 的 FOLDER_SEP 一致（data-model §5）
       let ALL = [];
       let selectedSource = null; // null = 全部 source
       let selectedFolder = null; // null = source 本身；"" = Uncategorized；否则 folder 路径
@@ -182,19 +183,19 @@
         renderList();
       }
 
-      // ---- folder 树构建（扁平 "A / B / C" 路径 → 嵌套） ----
+      // ---- folder 树构建（扁平 "A::B::C" 路径 → 嵌套） ----
       function buildTree(source) {
         const root = { name: "", path: "", children: new Map() };
         for (const b of ALL) {
           if (b.source !== source) continue;
           const f = (b.folder || "").trim();
           if (!f) continue;
-          const parts = f.split(" / ");
+          const parts = f.split(FOLDER_SEP);
           let node = root;
           let acc = [];
           for (const p of parts) {
             acc.push(p);
-            const path = acc.join(" / ");
+            const path = acc.join(FOLDER_SEP);
             if (!node.children.has(p)) {
               node.children.set(p, { name: p, path, children: new Map() });
             }
@@ -205,7 +206,7 @@
       }
 
       function subtreeCount(source, path) {
-        const prefix = path + " / ";
+        const prefix = path + FOLDER_SEP;
         let n = 0;
         for (const b of ALL) {
           if (b.source !== source) continue;
@@ -342,7 +343,7 @@
           if (selectedFolder === "") {
             list = list.filter((b) => (b.folder || "") === "");
           } else {
-            const prefix = selectedFolder + " / ";
+            const prefix = selectedFolder + FOLDER_SEP;
             list = list.filter((b) => {
               const f = b.folder || "";
               return f === selectedFolder || f.startsWith(prefix);

@@ -51,9 +51,20 @@ function keywordFilter(items: Bookmark[], keyword: string): Bookmark[] {
   });
 }
 
+/** detail 面板 markdown：title/url/excerpt/note，让目标书签细节一眼可见（多行内容 List 里只有 Detail 一条路）。 */
+function detailMarkdown(b: Bookmark): string {
+  const parts: string[] = [`## ${b.title || b.url || "(untitled)"}`];
+  if (b.url) parts.push(`[${b.url}](${b.url})`);
+  if (b.excerpt) parts.push(b.excerpt);
+  if (b.note) parts.push(`**Note**\n\n${b.note}`);
+  return parts.join("\n\n");
+}
+
 export default function Command() {
   const [searchText, setSearchText] = useState("");
   const [source, setSource] = useState(ALL_SOURCES);
+  // detail 面板默认开：直接对上「尽可能一并展示细节」；⌘Y 切回紧凑列表（此时 accessories 才显示）。
+  const [showDetail, setShowDetail] = useState(true);
   // load-once：与 App/Web 前端一致，CLI 只负责 load，过滤在内存（对 CJK 最可预测）。
   const { data, isLoading, error, revalidate } = useExec(BIN, ["--all", "ls", "--json", "--sort", "visited"], {
     keepPreviousData: true,
@@ -94,6 +105,7 @@ export default function Command() {
     <List
       isLoading={isLoading}
       filtering={false}
+      isShowingDetail={showDetail}
       onSearchTextChange={setSearchText}
       searchBarPlaceholder="Search bookmarks (title / url / folder / note / tags)…"
       searchBarAccessory={
@@ -120,12 +132,45 @@ export default function Command() {
               key={b.id}
               icon={b.favorite ? Icon.Star : Icon.Bookmark}
               title={b.title || b.url}
-              subtitle={b.title ? b.url : undefined}
-              accessories={accessories}
+              subtitle={showDetail ? undefined : b.title ? b.url : undefined}
+              accessories={showDetail ? undefined : accessories}
               keywords={[b.url, b.folder, ...b.tags]}
+              detail={
+                <List.Item.Detail
+                  markdown={detailMarkdown(b)}
+                  metadata={
+                    <List.Item.Detail.Metadata>
+                      {b.url ? <List.Item.Detail.Metadata.Link title="URL" text={b.url} target={b.url} /> : null}
+                      {b.folder ? (
+                        <List.Item.Detail.Metadata.Label title="Folder" text={b.folder} icon={Icon.Folder} />
+                      ) : null}
+                      <List.Item.Detail.Metadata.Label title="Source" text={b.source} />
+                      {b.tags.length > 0 ? (
+                        <List.Item.Detail.Metadata.TagList title="Tags">
+                          {b.tags.map((t) => (
+                            <List.Item.Detail.Metadata.TagList.Item key={t} text={t} />
+                          ))}
+                        </List.Item.Detail.Metadata.TagList>
+                      ) : null}
+                      {b.favorite ? (
+                        <List.Item.Detail.Metadata.Label title="Favorite" text="Yes" icon={Icon.Star} />
+                      ) : null}
+                      {b.last_visited > 0 ? (
+                        <List.Item.Detail.Metadata.Label title="Last Visited" text={b.last_visited_jst} />
+                      ) : null}
+                    </List.Item.Detail.Metadata>
+                  }
+                />
+              }
               actions={
                 <ActionPanel>
                   <Action title="Open in Browser" icon={Icon.Globe} onAction={() => open(b)} />
+                  <Action
+                    title={showDetail ? "Hide Details" : "Show Details"}
+                    icon={Icon.Eye}
+                    shortcut={Keyboard.Shortcut.Common.ToggleQuickLook}
+                    onAction={() => setShowDetail((v) => !v)}
+                  />
                   <Action.CopyToClipboard title="Copy URL" content={b.url} shortcut={Keyboard.Shortcut.Common.Copy} />
                   <Action.CopyToClipboard
                     title="Copy Title"

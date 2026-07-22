@@ -11,6 +11,13 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.16.0] - 2026-07-22
+
+### Changed
+
+- App / Web 书签列表在标题与网址下多显示摘要与备注，更易辨认目标书签
+- Raycast 默认展开详情面板（标题 / 网址 / 摘要 / 备注 + 元信息），⌘Y 切回紧凑列表
+
 ## [0.15.0] - 2026-07-22
 
 ### Changed

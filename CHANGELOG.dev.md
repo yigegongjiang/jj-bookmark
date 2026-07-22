@@ -7,6 +7,14 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.16.0] - 2026-07-22
+
+- App / Web 书签列表在标题与网址下多显示摘要与备注，更易辨认目标书签
+  - App `BookmarkCellView` 加 excerpt / note 单行截断 label（空则 `isHidden` 塌陷），`MainViewController.tableView(_:heightOfRow:)` = 46 + 各存在项 17 变行高（单行 → 无需测量文本）；excerpt/note 复用 subtitle 的 selected 态配色，全文走 `toolTip`，note 加 `✎` 前缀区分
+  - Web `index.html` bookmarkRow 在 `.sub` 下追加 `.detail` / `.detail.note`（仅非空 render，`-webkit-line-clamp: 2` 换行截断）
+- Raycast 默认展开详情面板（标题 / 网址 / 摘要 / 备注 + 元信息），⌘Y 切回紧凑列表
+  - `search-bookmarks.tsx` `isShowingDetail` 默认 `true` + `List.Item.Detail`（markdown title/url/excerpt/note + Metadata folder/source/tags/favorite/visited）；detail 开启时窄列隐藏 accessories，故一眼信息迁入 Metadata，subtitle 亦仅紧凑态显示；⌘Y = `Common.ToggleQuickLook`
+
 ## [0.15.0] - 2026-07-22
 
 - folder 层级分隔符由 `A / B`（空格斜杠）改为 `A::B`（无空格），避免 AI 保存时丢空格致层级错位；本机数据已自动迁移

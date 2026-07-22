@@ -125,6 +125,22 @@
         text-overflow: ellipsis;
       }
       .row .dom { color: var(--domain); font-weight: 600; }
+      /* excerpt / note：仅非空时插入，最多 2 行截断（换行，与 title/sub 的 nowrap 不同） */
+      .row .detail {
+        margin-top: 3px;
+        font-size: 11px;
+        line-height: 1.4;
+        color: var(--fg-2);
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        word-break: break-word;
+      }
+      .row .detail.note {
+        padding-left: 7px;
+        border-left: 2px solid var(--border);
+      }
       .empty { padding: 40px; text-align: center; color: var(--fg-2); }
     </style>
   </head>
@@ -423,6 +439,22 @@
           sub.appendChild(rest);
         }
         row.appendChild(sub);
+
+        // excerpt / note：仅非空时追加（各自 ≤2 行截断），让目标书签细节一眼可见
+        const excerpt = (b.excerpt || "").trim();
+        if (excerpt) {
+          const el = document.createElement("div");
+          el.className = "detail";
+          el.textContent = excerpt;
+          row.appendChild(el);
+        }
+        const note = (b.note || "").trim();
+        if (note) {
+          const el = document.createElement("div");
+          el.className = "detail note";
+          el.textContent = note;
+          row.appendChild(el);
+        }
         return row;
       }
 

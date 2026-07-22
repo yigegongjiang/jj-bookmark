@@ -674,6 +674,16 @@ extension MainViewController: NSOutlineViewDataSource, NSOutlineViewDelegate {
 extension MainViewController: NSTableViewDataSource, NSTableViewDelegate {
     func numberOfRows(in _: NSTableView) -> Int { visible.count }
 
+    // 行高随 excerpt / note 是否存在变化：基准两行 46，各非空的 excerpt / note 再各占一行 17。
+    // 单行截断 → 高度是「present 行数」的确定函数，无需测量文本。
+    func tableView(_: NSTableView, heightOfRow row: Int) -> CGFloat {
+        let b = visible[row]
+        var h: CGFloat = 46
+        if !b.excerpt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { h += 17 }
+        if !b.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { h += 17 }
+        return h
+    }
+
     func tableView(_: NSTableView, viewFor _: NSTableColumn?, row: Int) -> NSView? {
         let cell = (tableView.makeView(withIdentifier: BookmarkCellView.reuseID, owner: self)
             as? BookmarkCellView) ?? {

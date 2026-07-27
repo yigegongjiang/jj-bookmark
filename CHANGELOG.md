@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.17.0] - 2026-07-27
+
+### Added
+
+- 新增个人导航页（hao123 式）：`123.yigegongjiang.com`（或预览域 `/123`）直达，分组 + 链接在页面内直接增删改、拖拽排序、自动保存；数据只存云端，Google 登录访问
+
 ## [0.16.0] - 2026-07-22
 
 ### Changed

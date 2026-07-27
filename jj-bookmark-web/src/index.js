@@ -1,4 +1,6 @@
-// Worker 入口：/api/bookmarks 读 R2 数据；其余路由交静态资源（preview page）。
+// Worker 入口：/api/bookmarks 读 R2 数据；/api/nav 读写导航页数据；其余路由交静态资源。
+// 页面两张：/ = 只读 preview page；/123 = 个人导航页（hao123 式，web 即唯一 CRUD 入口）。
+// 自定义域 123.yigegongjiang.com 指向同一 Worker，host 命中即渲染导航页（路径无语义）。
 //
 // 认证 = 双层：① Cloudflare Access 在边缘按 Google 登录网关；② 本 Worker 再校验
 // Access 注入的 JWT（Cf-Access-Jwt-Assertion），堵住绕过边缘（如直连 workers.dev）的口子。
@@ -6,9 +8,19 @@
 // CF_ACCESS_TEAM_DOMAIN / CF_ACCESS_AUD 缺任一则跳过 ②，仅靠 ①（便于本地 dev / 未配场景）。
 
 const R2_KEY = "bookmarks.json"; // 与 CLI push 固定 key 对齐（data-model 顶层 {version,bookmarks}）
+const NAV_KEY = "nav.json"; // 导航页数据（同 bucket；仅经 /api/nav 读写，无本地副本）
+const NAV_HOST = "123.yigegongjiang.com";
+const NAV_MAX_BYTES = 512 * 1024;
 
 export default {
   async fetch(request, env) {
+    // 123 域未被 Access 应用覆盖时边缘不注入 JWT（无从登录），302 到主域同页走既有登录网关；
+    // 人类在 Access 应用补上该 hostname 后请求自带 JWT，自动切回本域直出，无需改代码。
+    const reqUrl = new URL(request.url);
+    if (reqUrl.hostname === NAV_HOST && !getAccessToken(request)) {
+      return Response.redirect("https://jj-bookmark.yigegongjiang.com/123", 302);
+    }
+
     const denied = await verifyAccess(request, env);
     if (denied) return denied;
 
@@ -26,11 +38,87 @@ export default {
         },
       });
     }
+    if (url.pathname === "/api/nav") {
+      return handleNav(request, env);
+    }
 
-    // 非 API：静态资源（/ → public/index.html）
+    // 导航域：任意非 API 路径都渲染导航页
+    if (url.hostname === NAV_HOST) {
+      url.pathname = "/123";
+      return env.ASSETS.fetch(new Request(url, request));
+    }
+    // 非 API：静态资源（/ → public/index.html，/123 → public/123.html）
     return env.ASSETS.fetch(request);
   },
 };
+
+// ---- 导航页数据（R2 nav.json，页面即唯一数据源） ----
+
+/// GET → { etag, data }（对象缺失 = 空库 + etag:null）；
+/// PUT → 服务端字段白名单重建后整份覆写；If-Match 走 R2 条件写（onlyIf.etagMatches），
+///        失配 409（防两个 tab 相互覆盖），成功回 { etag } 供客户端接续。
+async function handleNav(request, env) {
+  if (request.method === "GET") {
+    const obj = await env.BOOKMARKS.get(NAV_KEY);
+    if (!obj) {
+      return jsonResponse(JSON.stringify({ etag: null, data: { version: 1, groups: [] } }));
+    }
+    const data = await obj.text();
+    return jsonResponse(`{"etag":${JSON.stringify(obj.etag)},"data":${data}}`);
+  }
+  if (request.method === "PUT") {
+    const raw = await request.text();
+    if (raw.length > NAV_MAX_BYTES) return textError(413, "payload too large");
+    let doc;
+    try {
+      doc = JSON.parse(raw);
+    } catch {
+      return textError(400, "invalid JSON");
+    }
+    const clean = sanitizeNav(doc);
+    if (typeof clean === "string") return textError(400, clean);
+
+    const ifMatch = request.headers.get("If-Match");
+    const res = await env.BOOKMARKS.put(NAV_KEY, JSON.stringify(clean, null, 2), {
+      httpMetadata: { contentType: "application/json" },
+      ...(ifMatch ? { onlyIf: { etagMatches: ifMatch } } : {}),
+    });
+    if (!res) return textError(409, "etag mismatch"); // 条件写失配 → 客户端重载最新数据
+    return jsonResponse(JSON.stringify({ etag: res.etag }));
+  }
+  return textError(405, "method not allowed");
+}
+
+/// 校验并按白名单重建导航数据；合法返回重建后的对象，非法返回错误消息字符串。
+function sanitizeNav(doc) {
+  if (!doc || typeof doc !== "object" || Array.isArray(doc)) return "doc must be an object";
+  if (doc.version !== 1) return "unsupported version";
+  if (!Array.isArray(doc.groups) || doc.groups.length > 200) return "invalid groups";
+  const groups = [];
+  for (const g of doc.groups) {
+    if (!g || typeof g !== "object") return "invalid group";
+    if (typeof g.name !== "string" || g.name.length > 100) return "invalid group name";
+    if (!Array.isArray(g.links) || g.links.length > 500) return "invalid links";
+    const links = [];
+    for (const l of g.links) {
+      if (!l || typeof l !== "object") return "invalid link";
+      if (typeof l.name !== "string" || l.name.length > 200) return "invalid link name";
+      if (typeof l.url !== "string" || l.url.length > 2048 || !/^https?:\/\//i.test(l.url)) {
+        return "invalid link url";
+      }
+      links.push({ name: l.name, url: l.url });
+    }
+    groups.push({ name: g.name, links });
+  }
+  return { version: 1, groups };
+}
+
+function textError(status, msg) {
+  return new Response(msg + "\n", {
+    status,
+    headers: { "content-type": "text/plain; charset=utf-8" },
+  });
+}
 
 function jsonResponse(body) {
   return new Response(body, {

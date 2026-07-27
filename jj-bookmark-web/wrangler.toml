@@ -1,11 +1,13 @@
-# Cloudflare Worker：只读 preview page + /api/bookmarks（读 R2）。
+# Cloudflare Worker：只读 preview page + /api/bookmarks（读 R2）+ 导航页 /123 + /api/nav（读写 R2 nav.json）。
 # 认证：Cloudflare Access（Google IdP）边缘网关 + Worker 校验 Access JWT（见 README / src/index.js）。
 # Worker 名 = jj-bookmark（与目录名 jj-bookmark-web 不同，对齐 Access 应用所配域名）。
 name = "jj-bookmark"
 main = "src/index.js"
 compatibility_date = "2026-07-17"
 
-# 关闭 workers.dev 域（production + preview）——已启用自定义域 `jj-bookmark.yigegongjiang.com`；
+# 关闭 workers.dev 域（production + preview）——自定义域 `jj-bookmark.yigegongjiang.com` +
+# `123.yigegongjiang.com`（导航页，host 路由见 src/index.js）均已在 Cloudflare 侧挂载，
+# 不写 routes：GHA deploy 的 API token 仅 Workers + R2 权限，声明域名会因权限不足而部署失败（见 README）。
 # preview URL `*-jj-bookmark.<subdomain>.workers.dev` 默认 Public，即使 Worker 有 JWT 校验也一并关，减少攻击面。
 workers_dev = false
 preview_urls = false

@@ -7,6 +7,13 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.17.0] - 2026-07-27
+
+- 新增个人导航页（hao123 式）：`123.yigegongjiang.com`（或预览域 `/123`）直达，分组 + 链接在页面内直接增删改、拖拽排序、自动保存；数据只存云端，Google 登录访问
+  - `jj-bookmark-web/public/123.html` 单文件页：浏览 / 编辑双模式、HTML5 DnD 排序（组内 / 跨组 / 组间）、600ms 防抖自动 PUT、`beforeunload` 护栏、URL 自动补 scheme + 空名回填 hostname
+  - `src/index.js` `/api/nav` GET/PUT R2 `nav.json`：PUT 服务端字段白名单重建 + `If-Match` → R2 `onlyIf.etagMatches` 条件写，失配 409 → 客户端提示重载；host = `123.yigegongjiang.com` 时非 API 路径一律渲染 `/123` 资源，请求无 Access JWT（该域未被 Access 应用覆盖）则 302 主域 `/123` 走既有登录网关，覆盖后自动本域直出
+  - 自定义域挂载：临时 `routes = [{ pattern, custom_domain = true }]` + 本机 `npx wrangler deploy` 一次性完成后还原 toml（GHA token 无域名权限，routes 不入库）；Access 复用既有应用加 hostname（AUD 不变，人类一次性配置）
+
 ## [0.16.0] - 2026-07-22
 
 - App / Web 书签列表在标题与网址下多显示摘要与备注，更易辨认目标书签

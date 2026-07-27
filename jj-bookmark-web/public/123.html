@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>123</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --bg-side: #f5f5f7;
+        --bg-header: #fbfbfd;
+        --border: #e0e0e2;
+        --row-hover: #ececef;
+        --sel: #0a66ff;
+        --fg: #1d1d1f;
+        --fg-2: #6e6e73;
+        --danger: #d3202a;
+        --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+          Arial, "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1e1e1e;
+          --bg-side: #252526;
+          --bg-header: #2a2a2b;
+          --border: #3a3a3c;
+          --row-hover: #323234;
+          --sel: #0a66ff;
+          --fg: #f5f5f7;
+          --fg-2: #9a9a9e;
+          --danger: #ff6b6b;
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; }
+      body {
+        font-family: var(--font);
+        font-size: 14px;
+        color: var(--fg);
+        background: var(--bg);
+      }
+      header {
+        position: sticky;
+        top: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 20px;
+        background: var(--bg-header);
+        border-bottom: 1px solid var(--border);
+      }
+      .brand { font-weight: 700; font-size: 15px; letter-spacing: 0.04em; }
+      #status { margin-left: auto; color: var(--fg-2); font-size: 12px; }
+      #status.err { color: var(--danger); cursor: pointer; }
+      button {
+        font: inherit;
+        font-size: 13px;
+        color: var(--fg);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 5px 12px;
+        cursor: pointer;
+      }
+      button:hover { border-color: var(--sel); }
+      main { max-width: 1040px; margin: 0 auto; padding: 8px 24px 80px; }
+      .empty { padding: 80px 0; text-align: center; color: var(--fg-2); }
+
+      /* ---- 浏览模式 ---- */
+      .group { margin-top: 28px; }
+      .group h2 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--fg-2);
+      }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      a.chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 7px 11px;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        color: var(--fg);
+        text-decoration: none;
+        background: var(--bg);
+      }
+      a.chip:hover { border-color: var(--sel); background: var(--row-hover); }
+      .mark {
+        flex: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .chip .name {
+        max-width: 240px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .group .none { color: var(--fg-2); font-size: 12px; }
+
+      /* ---- 编辑模式 ---- */
+      .gcard {
+        margin-top: 20px;
+        padding: 12px 14px;
+        border: 1px dashed var(--border);
+        border-radius: 10px;
+        background: var(--bg-side);
+      }
+      .ghead { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+      .handle {
+        flex: none;
+        cursor: grab;
+        color: var(--fg-2);
+        padding: 2px 4px;
+        user-select: none;
+        font-size: 13px;
+      }
+      input {
+        font: inherit;
+        font-size: 13px;
+        color: var(--fg);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 5px 9px;
+        outline: none;
+        min-width: 0;
+      }
+      input:focus { border-color: var(--sel); }
+      .gname { font-weight: 600; flex: 0 1 240px; }
+      .lrow { display: flex; align-items: center; gap: 8px; padding: 3px 0; flex-wrap: wrap; }
+      .lname { flex: 1 1 160px; }
+      .lurl { flex: 2 1 280px; }
+      .del {
+        flex: none;
+        border: none;
+        background: none;
+        color: var(--fg-2);
+        font-size: 15px;
+        padding: 2px 7px;
+        line-height: 1;
+      }
+      .del:hover { color: var(--danger); border: none; }
+      .addlink, #addgroup {
+        margin-top: 8px;
+        border-style: dashed;
+        color: var(--fg-2);
+        background: none;
+      }
+      #addgroup { display: block; width: 100%; margin-top: 20px; padding: 9px; }
+      .drop { box-shadow: 0 -2px 0 0 var(--sel); }
+      .gcard.drop { box-shadow: 0 -3px 0 0 var(--sel); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="brand">123</span>
+      <span id="status"></span>
+      <button id="mode">编辑</button>
+    </header>
+    <main id="main"></main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let doc = { version: 1, groups: [] };
+      let etag = null;
+      let editing = false;
+      let saveTimer = null; // 非 null = 有变更待保存
+      let saving = false;
+      let pendingSave = false;
+      let statusTimer = null;
+      let drag = null; // {type:'link',gi,li} | {type:'group',gi}
+      let hoverEl = null;
+      let focusReq = null; // render 后聚焦目标 {gi, li?, field}
+
+      // ---- 加载 / 保存（整份文档 + etag CAS，600ms 防抖自动保存） ----
+      async function load() {
+        try {
+          const r = await fetch("/api/nav", { cache: "no-store" });
+          if (!r.ok) throw new Error(r.status);
+          const j = await r.json();
+          doc = j.data && Array.isArray(j.data.groups) ? j.data : { version: 1, groups: [] };
+          etag = j.etag;
+          render();
+        } catch {
+          const m = $("main");
+          m.textContent = "";
+          const e = div("empty", "加载失败 ");
+          const b = document.createElement("button");
+          b.textContent = "重试";
+          b.addEventListener("click", load);
+          e.appendChild(b);
+          m.appendChild(e);
+        }
+      }
+
+      // 仅 http(s) 链接可展示 / 落库；空 url = 编辑中的草稿行，只存在于内存
+      function validUrl(l) {
+        return /^https?:\/\//i.test(l.url || "");
+      }
+
+      function serializeGroups() {
+        return doc.groups.map((g) => ({
+          name: g.name || "",
+          links: (g.links || []).filter(validUrl).map((l) => ({ name: l.name || "", url: l.url })),
+        }));
+      }
+
+      function scheduleSave() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveNow, 600);
+      }
+
+      async function saveNow() {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+        if (saving) {
+          pendingSave = true;
+          return;
+        }
+        saving = true;
+        setStatus("保存中…");
+        try {
+          const headers = { "content-type": "application/json" };
+          if (etag) headers["If-Match"] = etag;
+          const r = await fetch("/api/nav", {
+            method: "PUT",
+            headers,
+            body: JSON.stringify({ version: 1, groups: serializeGroups() }),
+          });
+          if (r.status === 409) {
+            alert("数据已在其他页面更新，将重新加载");
+            location.reload();
+            return;
+          }
+          if (!r.ok) throw new Error(r.status);
+          etag = (await r.json()).etag;
+          setStatus("已保存", { fade: true });
+        } catch {
+          setStatus("保存失败，点击重试", { err: true });
+        } finally {
+          saving = false;
+          if (pendingSave) {
+            pendingSave = false;
+            saveNow();
+          }
+        }
+      }
+
+      function setStatus(text, opts = {}) {
+        clearTimeout(statusTimer);
+        const s = $("status");
+        s.textContent = text;
+        s.className = opts.err ? "err" : "";
+        if (opts.fade) statusTimer = setTimeout(() => (s.textContent = ""), 2000);
+      }
+      $("status").addEventListener("click", () => {
+        if ($("status").className === "err") saveNow();
+      });
+
+      window.addEventListener("beforeunload", (e) => {
+        if (saveTimer !== null || saving) {
+          e.preventDefault();
+          e.returnValue = "";
+        }
+      });
+
+      // ---- 渲染 ----
+      function div(cls, text) {
+        const el = document.createElement("div");
+        el.className = cls;
+        if (text) el.textContent = text;
+        return el;
+      }
+
+      function render() {
+        const m = $("main");
+        m.textContent = "";
+        $("mode").textContent = editing ? "完成" : "编辑";
+        if (editing) renderEdit(m);
+        else renderView(m);
+        if (focusReq) {
+          const li = focusReq.li !== undefined ? `[data-li="${focusReq.li}"]` : "";
+          const el = m.querySelector(`[data-gi="${focusReq.gi}"]${li} .${focusReq.field}`);
+          if (el) el.focus();
+          focusReq = null;
+        }
+      }
+
+      function renderView(m) {
+        if (doc.groups.length === 0) {
+          m.appendChild(div("empty", "空空如也 — 点右上「编辑」开始添加"));
+          return;
+        }
+        for (const g of doc.groups) {
+          const sec = div("group");
+          const h = document.createElement("h2");
+          h.textContent = g.name || "未命名";
+          sec.appendChild(h);
+          const links = (g.links || []).filter(validUrl);
+          if (links.length === 0) {
+            sec.appendChild(div("none", "（空）"));
+          } else {
+            const chips = div("chips");
+            for (const l of links) chips.appendChild(chip(l));
+            sec.appendChild(chips);
+          }
+          m.appendChild(sec);
+        }
+      }
+
+      function chip(l) {
+        const a = document.createElement("a");
+        a.className = "chip";
+        a.href = l.url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.title = l.url;
+        const name = (l.name || "").trim() || host(l.url) || l.url;
+        a.appendChild(mark(name, l.url));
+        const n = document.createElement("span");
+        n.className = "name";
+        n.textContent = name;
+        a.appendChild(n);
+        return a;
+      }
+
+      function mark(name, url) {
+        const el = document.createElement("span");
+        el.className = "mark";
+        el.textContent = [...name][0].toUpperCase();
+        el.style.background = `hsl(${hue(host(url) || name)} 58% 46%)`;
+        return el;
+      }
+
+      function hue(s) {
+        let h = 0;
+        for (const c of s) h = (h * 31 + c.codePointAt(0)) % 360;
+        return h;
+      }
+
+      function host(url) {
+        try {
+          return new URL(url).hostname.replace(/^www\./, "");
+        } catch {
+          return "";
+        }
+      }
+
+      // ---- 编辑模式 ----
+      function renderEdit(m) {
+        doc.groups.forEach((g, gi) => m.appendChild(groupCard(g, gi)));
+        const add = document.createElement("button");
+        add.id = "addgroup";
+        add.textContent = "＋ 新分组";
+        add.addEventListener("click", () => {
+          doc.groups.push({ name: "", links: [] });
+          focusReq = { gi: doc.groups.length - 1, field: "gname" };
+          render();
+          scheduleSave();
+        });
+        // 拖分组到末尾的落点
+        dropTarget(add, "group", () => moveGroup(drag.gi, doc.groups.length));
+        m.appendChild(add);
+      }
+
+      function groupCard(g, gi) {
+        const card = div("gcard");
+        card.dataset.gi = gi;
+
+        const head = div("ghead");
+        head.appendChild(dragHandle(card, { type: "group", gi }));
+        const name = document.createElement("input");
+        name.className = "gname";
+        name.placeholder = "分组名";
+        name.value = g.name || "";
+        name.addEventListener("input", () => {
+          g.name = name.value;
+          scheduleSave();
+        });
+        head.appendChild(name);
+        head.appendChild(delButton(() => {
+          const n = (g.links || []).length;
+          if (n && !confirm(`删除分组「${g.name || "未命名"}」及其 ${n} 条链接？`)) return;
+          doc.groups.splice(gi, 1);
+          render();
+          scheduleSave();
+        }));
+        card.appendChild(head);
+
+        (g.links || []).forEach((l, li) => card.appendChild(linkRow(g, gi, l, li)));
+
+        const add = document.createElement("button");
+        add.className = "addlink";
+        add.textContent = "＋ 链接";
+        add.addEventListener("click", () => {
+          g.links.push({ name: "", url: "" });
+          focusReq = { gi, li: g.links.length - 1, field: "lname" };
+          render();
+        });
+        // 拖链接到本组末尾的落点
+        dropTarget(add, "link", () => moveLink(drag.gi, drag.li, gi, null));
+        card.appendChild(add);
+
+        // 组卡片本身：分组拖拽 = 插到本组前；链接拖到卡片空白处 = 追加到本组
+        card.addEventListener("dragover", (e) => {
+          if (!drag) return;
+          e.preventDefault();
+          setHover(card);
+        });
+        card.addEventListener("drop", (e) => {
+          if (!drag) return;
+          e.preventDefault();
+          if (drag.type === "group") moveGroup(drag.gi, gi);
+          else moveLink(drag.gi, drag.li, gi, null);
+        });
+        return card;
+      }
+
+      function linkRow(g, gi, l, li) {
+        const row = div("lrow");
+        row.dataset.gi = gi;
+        row.dataset.li = li;
+        row.appendChild(dragHandle(row, { type: "link", gi, li }));
+
+        const name = document.createElement("input");
+        name.className = "lname";
+        name.placeholder = "名称";
+        name.value = l.name || "";
+        name.addEventListener("input", () => {
+          l.name = name.value;
+          scheduleSave();
+        });
+        row.appendChild(name);
+
+        const url = document.createElement("input");
+        url.className = "lurl";
+        url.placeholder = "https://…";
+        url.value = l.url || "";
+        url.addEventListener("input", () => {
+          l.url = url.value;
+          scheduleSave();
+        });
+        url.addEventListener("change", () => {
+          let v = url.value.trim();
+          if (v && !/^[a-z][a-z0-9+.-]*:\/\//i.test(v)) v = "https://" + v;
+          l.url = v;
+          url.value = v;
+          if (!(l.name || "").trim() && host(v)) {
+            l.name = host(v);
+            name.value = l.name;
+          }
+          scheduleSave();
+        });
+        row.appendChild(url);
+
+        row.appendChild(delButton(() => {
+          if (!confirm(`删除「${(l.name || "").trim() || l.url || "空行"}」？`)) return;
+          g.links.splice(li, 1);
+          render();
+          scheduleSave();
+        }));
+
+        // 拖链接到本行 = 插到本行前
+        dropTarget(row, "link", () => moveLink(drag.gi, drag.li, gi, li));
+        return row;
+      }
+
+      function delButton(onclick) {
+        const b = document.createElement("button");
+        b.className = "del";
+        b.textContent = "✕";
+        b.title = "删除";
+        b.addEventListener("click", onclick);
+        return b;
+      }
+
+      // ---- 拖拽排序 ----
+      function dragHandle(ghost, info) {
+        const h = document.createElement("span");
+        h.className = "handle";
+        h.textContent = "⠿";
+        h.title = "拖拽排序";
+        h.draggable = true;
+        h.addEventListener("dragstart", (e) => {
+          drag = info;
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", "");
+          e.dataTransfer.setDragImage(ghost, 12, 12);
+        });
+        h.addEventListener("dragend", () => {
+          drag = null;
+          setHover(null);
+        });
+        return h;
+      }
+
+      function dropTarget(el, type, action) {
+        el.addEventListener("dragover", (e) => {
+          if (!drag || drag.type !== type) return;
+          e.preventDefault();
+          e.stopPropagation();
+          setHover(el);
+        });
+        el.addEventListener("drop", (e) => {
+          if (!drag || drag.type !== type) return;
+          e.preventDefault();
+          e.stopPropagation();
+          action();
+        });
+      }
+
+      function setHover(el) {
+        if (hoverEl && hoverEl !== el) hoverEl.classList.remove("drop");
+        hoverEl = el;
+        if (el) el.classList.add("drop");
+      }
+
+      function moveLink(fromGi, fromLi, toGi, toLi) {
+        setHover(null);
+        const [l] = doc.groups[fromGi].links.splice(fromLi, 1);
+        let idx = toLi === null ? doc.groups[toGi].links.length : toLi;
+        if (fromGi === toGi && toLi !== null && fromLi < toLi) idx--;
+        doc.groups[toGi].links.splice(idx, 0, l);
+        drag = null;
+        render();
+        scheduleSave();
+      }
+
+      function moveGroup(fromGi, toGi) {
+        setHover(null);
+        const [g] = doc.groups.splice(fromGi, 1);
+        doc.groups.splice(fromGi < toGi ? toGi - 1 : toGi, 0, g);
+        drag = null;
+        render();
+        scheduleSave();
+      }
+
+      // ---- 模式切换 ----
+      $("mode").addEventListener("click", () => {
+        editing = !editing;
+        if (!editing && saveTimer !== null) saveNow(); // 退出编辑即冲刷待存变更
+        render();
+      });
+
+      load();
+    </script>
+  </body>
+</html>

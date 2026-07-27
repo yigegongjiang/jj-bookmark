@@ -5,10 +5,12 @@ name = "jj-bookmark"
 main = "src/index.js"
 compatibility_date = "2026-07-17"
 
-# 关闭 workers.dev 域（production + preview）——自定义域 `jj-bookmark.yigegongjiang.com` +
-# `123.yigegongjiang.com`（导航页，host 路由见 src/index.js）均已在 Cloudflare 侧挂载，
-# 不写 routes：GHA deploy 的 API token 仅 Workers + R2 权限，声明域名会因权限不足而部署失败（见 README）。
-# preview URL `*-jj-bookmark.<subdomain>.workers.dev` 默认 Public，即使 Worker 有 JWT 校验也一并关，减少攻击面。
+# 自定义域 `jj-bookmark.yigegongjiang.com` + `123.yigegongjiang.com`（导航页，host 路由见 src/index.js）
+# 均已在 Cloudflare 侧挂载，不写 routes：GHA deploy 的 API token 仅 Workers + R2 权限，
+# 声明域名会因权限不足而部署失败（见 README）。
+# 关闭 workers.dev 域（production + preview）缩小攻击面 —— 硬约束，MUST NOT 打开。
+# 配套要求：Access 应用的 destinations MUST NOT 残留任何 `*.workers.dev`，否则多域跨站 SSO
+# 的 `/cdn-cgi/access/authorized` 会挑中该不可达域 → 404，第二个自定义域永远登不进（见 README「前置」）。
 workers_dev = false
 preview_urls = false
 

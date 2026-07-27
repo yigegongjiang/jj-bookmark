@@ -7,6 +7,12 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.17.1] - 2026-07-27
+
+- 修复 `123.yigegongjiang.com` 登录后跳到「Page not found」、始终进不去导航页
+  - 根因：Access 应用 destinations 残留 `jj-bookmark.fan-yang2019.workers.dev` + `123.fan-yang2019.workers.dev`，多域跨站 SSO 的 `/cdn-cgi/access/authorized` 挑中 workers.dev 设 cookie，而 `workers_dev = false` 下该域无路由 → 404 断链
+  - 修：Access destinations 只留两个自定义域（AUD / 策略不变）；`wrangler.toml` + README 记入硬约束——`workers_dev` MUST NOT 打开，destinations MUST NOT 残留 `*.workers.dev`
+
 ## [0.17.0] - 2026-07-27
 
 - 新增个人导航页（hao123 式）：`123.yigegongjiang.com`（或预览域 `/123`）直达，分组 + 链接在页面内直接增删改、拖拽排序、自动保存；数据只存云端，Google 登录访问

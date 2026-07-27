@@ -9,12 +9,13 @@
 - `public/123.html` — 导航页单文件 SPA：浏览 / 编辑双模式，编辑内联输入 + 拖拽排序（组内 / 跨组 / 组间），变更 600ms 防抖自动 PUT 整份文档，409 时提示并重载。
 - `wrangler.toml` — R2 绑定 `BOOKMARKS`（bucket `jj-bookmark`，两份数据同 bucket 异 key）+ 静态资源 `ASSETS`（`run_worker_first`）+ Access 参数 `vars`。
 - 认证 = 双层：① Cloudflare Access（Google IdP）在**边缘**按登录网关；② Worker 再校验 Access 注入的 JWT（`Cf-Access-Jwt-Assertion`：RS256 签名 + `iss`/`aud`/`exp`），堵住绕过边缘的口子。`run_worker_first` 令页面与 API 都经此校验。`CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` 缺任一则跳过 ②（本地 dev / 未配场景）。
-- 域接入 = 仅自定义域（`jj-bookmark.yigegongjiang.com` + `123.yigegongjiang.com`），均在 Cloudflare 侧挂载、不写 `routes`（GHA token 无域名权限，声明即部署失败）；新挂域名 = 临时在 `wrangler.toml` 加 `routes = [{ pattern = "...", custom_domain = true }]` → 本机 `npx wrangler deploy`（OAuth 有 zone 权限）→ 还原 toml。`workers_dev = false` + `preview_urls = false` 关闭 `*.workers.dev` 生产与 preview 域，进一步缩小攻击面。
+- 域接入 = 仅自定义域（`jj-bookmark.yigegongjiang.com` + `123.yigegongjiang.com`），均在 Cloudflare 侧挂载、不写 `routes`（GHA token 无域名权限，声明即部署失败）；新挂域名 = 临时在 `wrangler.toml` 加 `routes = [{ pattern = "...", custom_domain = true }]` → 本机 `npx wrangler deploy`（OAuth 有 zone 权限）→ 还原 toml。`workers_dev = false` + `preview_urls = false` 关闭 `*.workers.dev` 生产与 preview 域，缩小攻击面 —— 硬约束，MUST NOT 为任何理由打开；配套要求 Access destinations 也不得残留 workers.dev（见「前置」2）。
 
 ## 前置（人类在 Cloudflare 侧一次性配置）
 
 1. 建 R2 bucket：`wrangler r2 bucket create jj-bookmark`（名字须与 `wrangler.toml` 一致，否则 deploy 校验失败）。
-2. 配 Access：Zero Trust → Access → Applications，为本 Worker 域名建 self-hosted 应用，IdP 选 Google，策略限定允许的邮箱 / 域。应用的 team domain 与 AUD tag 已写入 `wrangler.toml` `[vars]`（Worker 据此校验 JWT）；换应用 / 账号时同步更新这两个值。`123.yigegongjiang.com` 加进**同一**应用（Add public hostname，同策略）→ AUD 不变、Worker 无需改动；单加应用会产生新 AUD 导致 403。
+2. 配 Access：Zero Trust → Access controls → Applications，建一个 self-hosted 应用同时覆盖两个自定义域，IdP 选 Google，策略限定允许的邮箱 / 域。应用的 team domain 与 AUD tag 已写入 `wrangler.toml` `[vars]`（Worker 据此校验 JWT）；换应用 / 账号时同步更新这两个值。两域同应用 → AUD 一致、Worker 无需分支；各自单建应用会产生不同 AUD 导致 403。
+   - destinations 只能是 `jj-bookmark.yigegongjiang.com` + `123.yigegongjiang.com`，MUST NOT 残留 `*.workers.dev`（建应用时 Cloudflare 常自动带上）：多域应用登录靠跨站 SSO，`/cdn-cgi/access/authorized` 会挑 destinations 里的某个域设 cookie，挑中 workers.dev 即 404（`workers_dev = false`），登录链断死且报 `Page not found`。
 3. 配 GHA secrets（仓库 Settings → Secrets）：`CLOUDFLARE_API_TOKEN`（含 Workers + R2 编辑权限）、`CLOUDFLARE_ACCOUNT_ID`。
 
 > 数据含内网 URL。Worker 自身校验 Access JWT，未带有效 token 一律 403；`workers.dev` 生产 + preview 域已在 `wrangler.toml` 关闭，仅自定义域可达。deploy 后即使边缘 Access 尚未覆盖某路由也不裸奔；R2 对象缺失时更只返回空库。仍 SHOULD 保持 Access 应用 + 策略在位（首要网关 + 提供 JWT）。

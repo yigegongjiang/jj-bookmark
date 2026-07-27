@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.17.1] - 2026-07-27
+
+### Fixed
+
+- 修复 `123.yigegongjiang.com` 登录后跳到「Page not found」、始终进不去导航页
+
 ## [0.17.0] - 2026-07-27
 
 ### Added

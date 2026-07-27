@@ -9,7 +9,7 @@
 # 可用工具
 
 - `gh` — 已登录（git push）
-- `npx wrangler` — Cloudflare CLI（web 调试 / R2 / 部署）；本机经 npx，无全局二进制
+- `npx wrangler` — Cloudflare CLI（R2 / 部署）；本机经 npx，无全局二进制
 
 # 调试
 
@@ -25,10 +25,11 @@
   - 运行：`open jj-bookmark-app/build/jj-bookmark.app`
   - 验证跨进程刷新：改动 `~/.config/jj-bookmark/bookmarks.json` 后 App 无需重启即刷新（FSEvents）
 - Web（`jj-bookmark-web/`）：AI 跳过本地运行时调试 —— 起 `wrangler dev` / 塞本地 R2 / curl / 浏览器验证在当前 project 均耗时且无收益；代码变更直接进 §3 提交，push master 由 §6 GHA 自动部署，出错人类自行发现。
-  - 例外 = 页面视觉 / 交互改版（布局、样式、拖拽、快捷键）或改数据结构：线上受 Access 保护、AI 无法登录复核，MUST 本地验证后再提交
-  - `npx wrangler dev --port 8791 --var CF_ACCESS_TEAM_DOMAIN: --var CF_ACCESS_AUD:`  # 置空 vars 跳过 JWT 校验
-  - `npx wrangler r2 object put jj-bookmark/nav.json --file <seed>.json --local`  # 塞本地 R2 种子数据（含旧版结构以验迁移）
-  - 渲染 / 交互复核走 ego-browser skill（截图 + 合成 DragEvent 验拖拽）；curl 打 `/api/nav` 验白名单与 `If-Match` 409
+  - 例外 = 页面视觉 / 交互改版（布局、样式、拖拽、快捷键）或改数据结构：需复核，且复核只在线上做 —— 不起 `wrangler dev`（本地无真实数据 + 绕过 Access，验不出真问题）
+  - 顺序：§3 提交 + push master → 等部署 `gh run watch $(gh run list -w deploy-web.yml -L1 --json databaseId -q '.[0].databaseId')` → ego-browser skill 开线上页复核 → 有问题则修复后重走本流程
+  - 线上页：导航页 `https://123.yigegongjiang.com`；预览页 `https://jj-bookmark.yigegongjiang.com`
+  - 复核手段：截图验视觉 / 合成 DragEvent 验拖拽 / 页面内 `fetch('/api/nav')` 验白名单与 `If-Match` 409（curl 无 Access token 必 403，不可用）
+  - Access 登录由人类协助：ego-browser 复用人类登录态；停在 Google 登录页时 `curl -s -G 'https://jj.yigegongjiang.com/notify' --data-urlencode 'text=jj-bookmark 线上复核需登录，请在 ego-browser 完成 Google 登录'` 通知人类，登录后继续
 
 # 发布
 

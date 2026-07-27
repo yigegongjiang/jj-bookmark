@@ -61,7 +61,7 @@ async function handleNav(request, env) {
   if (request.method === "GET") {
     const obj = await env.BOOKMARKS.get(NAV_KEY);
     if (!obj) {
-      return jsonResponse(JSON.stringify({ etag: null, data: { version: 1, groups: [] } }));
+      return jsonResponse(JSON.stringify({ etag: null, data: { version: 2, groups: [], links: [] } }));
     }
     const data = await obj.text();
     return jsonResponse(`{"etag":${JSON.stringify(obj.etag)},"data":${data}}`);
@@ -90,27 +90,38 @@ async function handleNav(request, env) {
 }
 
 /// 校验并按白名单重建导航数据；合法返回重建后的对象，非法返回错误消息字符串。
+/// v2 结构：links 扁平（顺序 = 手动排序），group 内联在链接上；groups 仅记分组展示顺序。
+/// 只收 v2 —— 页面读到 v1（{groups:[{name,links}]}）时在客户端迁移后再写回。
 function sanitizeNav(doc) {
   if (!doc || typeof doc !== "object" || Array.isArray(doc)) return "doc must be an object";
-  if (doc.version !== 1) return "unsupported version";
+  if (doc.version !== 2) return "unsupported version";
   if (!Array.isArray(doc.groups) || doc.groups.length > 200) return "invalid groups";
+  if (!Array.isArray(doc.links) || doc.links.length > 1000) return "invalid links";
   const groups = [];
   for (const g of doc.groups) {
-    if (!g || typeof g !== "object") return "invalid group";
-    if (typeof g.name !== "string" || g.name.length > 100) return "invalid group name";
-    if (!Array.isArray(g.links) || g.links.length > 500) return "invalid links";
-    const links = [];
-    for (const l of g.links) {
-      if (!l || typeof l !== "object") return "invalid link";
-      if (typeof l.name !== "string" || l.name.length > 200) return "invalid link name";
-      if (typeof l.url !== "string" || l.url.length > 2048 || !/^https?:\/\//i.test(l.url)) {
-        return "invalid link url";
-      }
-      links.push({ name: l.name, url: l.url });
-    }
-    groups.push({ name: g.name, links });
+    if (typeof g !== "string" || !g || g.length > 100) return "invalid group name";
+    if (!groups.includes(g)) groups.push(g);
   }
-  return { version: 1, groups };
+  const links = [];
+  for (const l of doc.links) {
+    if (!l || typeof l !== "object") return "invalid link";
+    if (typeof l.name !== "string" || l.name.length > 200) return "invalid link name";
+    if (typeof l.url !== "string" || l.url.length > 2048 || !/^https?:\/\//i.test(l.url)) {
+      return "invalid link url";
+    }
+    if (typeof l.group !== "string" || l.group.length > 100) return "invalid link group";
+    if (typeof l.color !== "string" || !/^#[0-9a-f]{6}$/i.test(l.color)) return "invalid link color";
+    if (!Number.isFinite(l.createdAt) || l.createdAt < 0) return "invalid link createdAt";
+    if (l.group && !groups.includes(l.group)) groups.push(l.group);
+    links.push({
+      name: l.name,
+      url: l.url,
+      group: l.group,
+      color: l.color.toLowerCase(),
+      createdAt: Math.floor(l.createdAt),
+    });
+  }
+  return { version: 2, groups: groups.filter((g) => links.some((l) => l.group === g)), links };
 }
 
 function textError(status, msg) {

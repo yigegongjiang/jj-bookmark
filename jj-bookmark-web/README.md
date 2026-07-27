@@ -1,12 +1,13 @@
 # jj-bookmark-web
 
-一个 Worker 两张页：① 只读 web 预览——从 R2 读 `bookmarks.json` 渲染仿 App 浏览页（folder 树 + 搜索 + 排序），数据由 CLI `jj-bookmark push` 单向上传；② 个人导航页（hao123 式）——`123.yigegongjiang.com`（或预览域 `/123`），分组 + 链接在页面内直接增删改 / 拖拽排序，R2 `nav.json` 为唯一数据源（无本地副本 / 无 CLI 参与）。
+一个 Worker 两张页：① 只读 web 预览——从 R2 读 `bookmarks.json` 渲染仿 App 浏览页（folder 树 + 搜索 + 排序），数据由 CLI `jj-bookmark push` 单向上传；② 个人导航页——`123.yigegongjiang.com`（或预览域 `/123`），卡片面板（搜索 / 分组筛选 / 高频·最近·手动三态排序 / 拖拽 / 内联增删改），R2 `nav.json` 为唯一数据源（无本地副本 / 无 CLI 参与）。
 
 ## 架构
 
 - `src/index.js` — Worker：`/api/bookmarks` 读 R2（缺失兜底空库）；`/api/nav` GET/PUT `nav.json`（PUT 服务端字段白名单重建 + `If-Match`→R2 `onlyIf.etagMatches` 条件写，失配 409 防多 tab 相互覆盖）；host = `123.yigegongjiang.com` 时任意非 API 路径渲染导航页（请求不带 Access JWT = 该域尚未被 Access 应用覆盖 → 302 主域 `/123` 走既有登录网关，覆盖后自动本域直出）；其余路由走静态资源。
 - `public/index.html` — 只读预览单文件 SPA（内联 CSS/JS）：拉 `/api/bookmarks` 后内存过滤 / 排序，无构建步骤。
-- `public/123.html` — 导航页单文件 SPA：浏览 / 编辑双模式，编辑内联输入 + 拖拽排序（组内 / 跨组 / 组间），变更 600ms 防抖自动 PUT 整份文档，409 时提示并重载。
+- `public/123.html` — 导航页单文件 SPA（暗 / 亮双主题）：卡片网格 + 搜索（`/` 聚焦、Enter 开首个结果）+ 分组 chip 筛选 + 排序三态（高频 / 最近 / 手动）；hover 出编辑·删除，内联表单增改（名称 / URL / 分组 / 8 色），手动态下拖拽排序（组内 / 跨组 / 分组间）+ 分组重命名；变更 500ms 防抖自动 PUT 整份文档，409 时提示并重载。
+- 导航数据 v2 = `{ version:2, groups:[名], links:[{name,url,group,color,createdAt}] }`：links 扁平，其顺序即手动排序（组内相对次序），`groups` 只记分组展示顺序；页面读到 v1（`groups:[{name,links}]`）在客户端迁移后写回，Worker 只接受 v2。点击次数属本机偏好，存 `localStorage`（不入库、不产生写流量）。
 - `wrangler.toml` — R2 绑定 `BOOKMARKS`（bucket `jj-bookmark`，两份数据同 bucket 异 key）+ 静态资源 `ASSETS`（`run_worker_first`）+ Access 参数 `vars`。
 - 认证 = 双层：① Cloudflare Access（Google IdP）在**边缘**按登录网关；② Worker 再校验 Access 注入的 JWT（`Cf-Access-Jwt-Assertion`：RS256 签名 + `iss`/`aud`/`exp`），堵住绕过边缘的口子。`run_worker_first` 令页面与 API 都经此校验。`CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD` 缺任一则跳过 ②（本地 dev / 未配场景）。
 - 域接入 = 仅自定义域（`jj-bookmark.yigegongjiang.com` + `123.yigegongjiang.com`），均在 Cloudflare 侧挂载、不写 `routes`（GHA token 无域名权限，声明即部署失败）；新挂域名 = 临时在 `wrangler.toml` 加 `routes = [{ pattern = "...", custom_domain = true }]` → 本机 `npx wrangler deploy`（OAuth 有 zone 权限）→ 还原 toml。`workers_dev = false` + `preview_urls = false` 关闭 `*.workers.dev` 生产与 preview 域，缩小攻击面 —— 硬约束，MUST NOT 为任何理由打开；配套要求 Access destinations 也不得残留 workers.dev（见「前置」2）。

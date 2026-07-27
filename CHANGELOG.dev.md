@@ -7,6 +7,17 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.18.0] - 2026-07-27
+
+- 导航页整页重做：卡片面板 + 搜索（`/` 聚焦、Enter 直开首个结果）+ 分组筛选 + 高频 / 最近 / 手动三态排序，暗亮双主题
+  - `public/123.html` 重写：设计令牌（`--bg/--elev/--surface/--border/--accent` + `prefers-color-scheme` 双主题）、`auto-fill minmax(248px,1fr)` 卡片网格、30px 首字母色块（域名 hash 取 8 色板）、hover 浮出 ops
+  - 静态 shell（header / 搜索 / 排序 / 添加）只建一次，仅 `#chips`/`#slot`/`#body` 重渲染 —— 搜索框不重建，输入焦点与光标不丢
+- 导航页改为随处可编辑：卡片悬停即出编辑 / 删除，内联表单填名称·网址·分组·配色，手动排序下拖拽调链接与分组顺序、分组可就地改名；不再需要切换「编辑模式」
+  - 数据 v2：`{version:2, groups:[名], links:[{name,url,group,color,createdAt}]}`，links 扁平且顺序 = 手动排序，`groups` 只记展示顺序；客户端 `migrate()` 兼容读 v1（`groups:[{name,links}]`）后写回 v2，`sanitizeNav()` 只收 v2（新增 group/color/createdAt 白名单校验，`links ≤ 1000`，落库前剪掉空分组）
+  - HTML5 DnD：grip 覆盖在色块上（仅手动态渲染），drop 落在 cell = 插到其前、落在 grid 空白 = 追加到该组、落在 section = 分组整体重排；`moveLink()` 换算全局下标（`before > from` 时 -1）
+- 导航页按本机点击次数排「高频」，次数只留在本浏览器，不上传
+  - `localStorage` `jj-nav-clicks`（click + 中键 auxclick 计数，load 时按现存 URL 剪枝）、`jj-nav-sort` 记排序态；避免每次点击都 PUT 整份文档触发 etag CAS 抖动
+
 ## [0.17.1] - 2026-07-27
 
 - 修复 `123.yigegongjiang.com` 登录后跳到「Page not found」、始终进不去导航页

@@ -4,222 +4,945 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="dark light" />
     <title>123</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%237c8bff'/%3E%3Ctext x='16' y='21.5' font-family='system-ui,sans-serif' font-size='13' font-weight='700' text-anchor='middle' fill='%230a0b0f'%3E123%3C/text%3E%3C/svg%3E"
+    />
     <style>
       :root {
-        color-scheme: light dark;
-        --bg: #ffffff;
-        --bg-side: #f5f5f7;
-        --bg-header: #fbfbfd;
-        --border: #e0e0e2;
-        --row-hover: #ececef;
-        --sel: #0a66ff;
-        --fg: #1d1d1f;
-        --fg-2: #6e6e73;
-        --danger: #d3202a;
-        --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
-          Arial, "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
+        color-scheme: dark;
+        --bg: #0a0b0f;
+        --elev: #101219;
+        --surface: #14161f;
+        --surface-2: #1a1d28;
+        --border: #23262f;
+        --border-2: #313543;
+        --fg: #e7e9f0;
+        --muted: #9096a3;
+        --faint: #656b78;
+        --accent: #7c8bff;
+        --accent-2: #96a2ff;
+        --accent-soft: rgba(124, 139, 255, 0.14);
+        --danger: #f87171;
+        --violet: #c084fc;
+        --glow: radial-gradient(60% 46% at 18% 0%, rgba(124, 139, 255, 0.14), transparent 72%);
+        --shadow: 0 12px 28px -14px rgba(0, 0, 0, 0.7);
+        --r: 9px;
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, "PingFang SC",
+          "Hiragino Sans", sans-serif;
+        --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
       }
-      @media (prefers-color-scheme: dark) {
+      @media (prefers-color-scheme: light) {
         :root {
-          --bg: #1e1e1e;
-          --bg-side: #252526;
-          --bg-header: #2a2a2b;
-          --border: #3a3a3c;
-          --row-hover: #323234;
-          --sel: #0a66ff;
-          --fg: #f5f5f7;
-          --fg-2: #9a9a9e;
-          --danger: #ff6b6b;
+          color-scheme: light;
+          --bg: #f3f4f9;
+          --elev: #ffffff;
+          --surface: #ffffff;
+          --surface-2: #f1f3f9;
+          --border: #e4e6ef;
+          --border-2: #d1d5e2;
+          --fg: #1b1d24;
+          --muted: #5c6270;
+          --faint: #868c9a;
+          --accent: #4f5bd5;
+          --accent-2: #3d49c2;
+          --accent-soft: rgba(79, 91, 213, 0.1);
+          --danger: #d3202a;
+          --violet: #8b5cf6;
+          --glow: radial-gradient(60% 46% at 18% 0%, rgba(79, 91, 213, 0.1), transparent 72%);
+          --shadow: 0 12px 28px -18px rgba(20, 24, 60, 0.35);
         }
       }
-      * { box-sizing: border-box; }
-      html, body { margin: 0; }
-      body {
-        font-family: var(--font);
-        font-size: 14px;
-        color: var(--fg);
-        background: var(--bg);
+      * {
+        box-sizing: border-box;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border-2) transparent;
       }
-      header {
-        position: sticky;
-        top: 0;
+      *::-webkit-scrollbar {
+        width: 9px;
+        height: 9px;
+      }
+      *::-webkit-scrollbar-thumb {
+        background: var(--border-2);
+        border: 2px solid transparent;
+        border-radius: 6px;
+        background-clip: padding-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        background: var(--glow), var(--bg);
+        color: var(--fg);
+        font-family: var(--sans);
+        font-size: 13px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+      ::selection {
+        background: var(--accent-soft);
+      }
+      svg {
+        display: block;
+      }
+
+      .page {
+        min-height: 100%;
+        padding: 36px 32px 64px;
+      }
+      .wrap {
+        width: 100%;
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+
+      /* ---------- header ---------- */
+      .top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 22px;
+      }
+      .logo {
+        width: 44px;
+        height: 44px;
+        flex: none;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, var(--accent), var(--violet));
+        color: #0a0b0f;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        box-shadow: 0 6px 20px -6px rgba(124, 139, 255, 0.5);
+      }
+      .titles {
+        min-width: 0;
+      }
+      .trow {
         display: flex;
         align-items: center;
         gap: 10px;
-        padding: 10px 20px;
-        background: var(--bg-header);
-        border-bottom: 1px solid var(--border);
       }
-      .brand { font-weight: 700; font-size: 15px; letter-spacing: 0.04em; }
-      #status { margin-left: auto; color: var(--fg-2); font-size: 12px; }
-      #status.err { color: var(--danger); cursor: pointer; }
-      button {
-        font: inherit;
-        font-size: 13px;
-        color: var(--fg);
-        background: var(--bg);
+      h1 {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 680;
+        letter-spacing: -0.02em;
+      }
+      .pill {
+        padding: 3px 9px;
         border: 1px solid var(--border);
-        border-radius: 6px;
-        padding: 5px 12px;
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+      .sub {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      #status {
+        margin-left: auto;
+        color: var(--faint);
+        font-size: 11.5px;
+        white-space: nowrap;
+      }
+      #status.err {
+        color: var(--danger);
         cursor: pointer;
       }
-      button:hover { border-color: var(--sel); }
-      main { max-width: 1040px; margin: 0 auto; padding: 8px 24px 80px; }
-      .empty { padding: 80px 0; text-align: center; color: var(--fg-2); }
 
-      /* ---- 浏览模式 ---- */
-      .group { margin-top: 28px; }
-      .group h2 {
-        margin: 0 0 10px;
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--fg-2);
-      }
-      .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-      a.chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-        padding: 7px 11px;
+      /* ---------- panel ---------- */
+      .panel {
+        padding: 20px;
         border: 1px solid var(--border);
-        border-radius: 9px;
-        color: var(--fg);
-        text-decoration: none;
-        background: var(--bg);
+        border-radius: 12px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 60%), var(--elev);
       }
-      a.chip:hover { border-color: var(--sel); background: var(--row-hover); }
-      .mark {
-        flex: none;
-        width: 20px;
-        height: 20px;
-        border-radius: 5px;
-        color: #fff;
-        font-size: 11px;
-        font-weight: 700;
+      .phead {
         display: flex;
         align-items: center;
-        justify-content: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 14px;
       }
-      .chip .name {
-        max-width: 240px;
+      .ptitle {
+        font-size: 11px;
+        font-weight: 680;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .tools {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .search {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+      .search .ic {
+        position: absolute;
+        left: 9px;
+        color: var(--faint);
+        pointer-events: none;
+      }
+      #q {
+        width: 210px;
+        height: 28px;
+        padding: 0 26px 0 28px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--fg);
+        font: inherit;
+        font-size: 12.5px;
+        outline: none;
+        transition: border-color 0.15s, width 0.15s;
+      }
+      #q:focus {
+        border-color: var(--accent);
+        width: 250px;
+      }
+      #q::placeholder {
+        color: var(--faint);
+      }
+      #qx {
+        position: absolute;
+        right: 5px;
+        display: none;
+        place-items: center;
+        width: 18px;
+        height: 18px;
+        padding: 0;
+        border: 0;
+        border-radius: 5px;
+        background: none;
+        color: var(--faint);
+        cursor: pointer;
+      }
+      #qx:hover {
+        background: var(--border);
+        color: var(--fg);
+      }
+      .seg {
+        display: inline-flex;
+        gap: 2px;
+        padding: 2px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg);
+      }
+      .seg button {
+        height: 24px;
+        padding: 0 10px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--faint);
+        font: inherit;
+        font-size: 11.5px;
+        font-weight: 550;
+        cursor: pointer;
+        transition: background 0.12s, color 0.12s;
+      }
+      .seg button:hover {
+        color: var(--muted);
+      }
+      .seg button.on {
+        background: var(--surface);
+        color: var(--fg);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 28px;
+        padding: 0 11px;
+        border: 1px solid var(--border-2);
+        border-radius: 7px;
+        background: var(--surface);
+        color: var(--muted);
+        font: inherit;
+        font-size: 12px;
+        font-weight: 550;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
+      }
+      .btn:hover {
+        background: var(--surface-2);
+        border-color: var(--accent);
+        color: var(--fg);
+      }
+      .btn.primary {
+        border-color: transparent;
+        background: var(--accent);
+        color: #0a0b0f;
+      }
+      .btn.primary:hover {
+        background: var(--accent-2);
+        color: #0a0b0f;
+      }
+
+      /* ---------- chips ---------- */
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-bottom: 16px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 25px;
+        padding: 0 11px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--muted);
+        font: inherit;
+        font-size: 11.5px;
+        cursor: pointer;
+        transition: background 0.12s, border-color 0.12s, color 0.12s;
+      }
+      .chip:hover {
+        border-color: var(--border-2);
+        color: var(--fg);
+      }
+      .chip.on {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .chip .n {
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+      .chip.on .n {
+        color: var(--accent);
+      }
+
+      /* ---------- editor ---------- */
+      .editor {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 14px;
+        margin-bottom: 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--r);
+        background: var(--surface);
+      }
+      .frow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .in {
+        height: 34px;
+        min-width: 0;
+        padding: 0 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--elev);
+        color: var(--fg);
+        font: inherit;
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+      .in:focus {
+        border-color: var(--accent);
+      }
+      .in::placeholder {
+        color: var(--faint);
+      }
+      .in.name {
+        flex: 1 1 220px;
+      }
+      .in.url {
+        flex: 2 1 340px;
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      .in.group {
+        flex: 1 1 200px;
+      }
+      .sws {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 2px;
+      }
+      .sw {
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        cursor: pointer;
+        transition: transform 0.12s, box-shadow 0.12s;
+      }
+      .sw:hover {
+        transform: scale(1.12);
+      }
+      .sw.on {
+        box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--fg);
+      }
+      .fact {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .ferr {
+        color: var(--danger);
+        font-size: 12px;
+      }
+      .fhint {
+        margin-left: auto;
+        color: var(--faint);
+        font-size: 11.5px;
+      }
+
+      /* ---------- sections + grid ---------- */
+      .sec + .sec {
+        margin-top: 22px;
+      }
+      .shead {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 9px;
+        padding-bottom: 7px;
+        border-bottom: 1px solid var(--border);
+      }
+      .shead h2 {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 640;
+        color: var(--fg);
+      }
+      .shead .n {
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 10.5px;
+      }
+      .shead .grip {
+        position: static;
+        width: 20px;
+        height: 20px;
+        background: none;
+        color: var(--faint);
+        opacity: 0;
+      }
+      .shead .grip.ghost {
+        visibility: hidden;
+      }
+      .sec:hover .shead .grip {
+        opacity: 1;
+      }
+      .iconbtn {
+        display: grid;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        background: none;
+        color: var(--faint);
+        cursor: pointer;
+        opacity: 0;
+        transition: background 0.12s, color 0.12s, opacity 0.12s;
+      }
+      .sec:hover .iconbtn,
+      .iconbtn:focus-visible {
+        opacity: 1;
+      }
+      .iconbtn:hover {
+        background: var(--surface-2);
+        color: var(--fg);
+      }
+      .srename {
+        height: 24px;
+        padding: 0 8px;
+        border: 1px solid var(--accent);
+        border-radius: 6px;
+        background: var(--elev);
+        color: var(--fg);
+        font: inherit;
+        font-size: 12px;
+        font-weight: 640;
+        outline: none;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+        gap: 10px;
+      }
+      .cell {
+        position: relative;
+        display: flex;
+        min-width: 0;
+      }
+      .card {
+        display: flex;
+        flex: 1;
+        align-items: flex-start;
+        gap: 11px;
+        min-width: 0;
+        min-height: 66px;
+        padding: 12px 66px 12px 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--r);
+        background: var(--surface);
+        color: var(--fg);
+        text-decoration: none;
+        transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+      }
+      .card:hover {
+        background: var(--surface-2);
+        border-color: var(--border-2);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow);
+      }
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        flex: none;
+        border-radius: 8px;
+        color: #0a0b0f;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .cbody {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .cname {
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+      .cmeta {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 5px;
+        min-width: 0;
+      }
+      .chost {
+        max-width: 100%;
         overflow: hidden;
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 10.5px;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      .group .none { color: var(--fg-2); font-size: 12px; }
-
-      /* ---- 编辑模式 ---- */
-      .gcard {
-        margin-top: 20px;
-        padding: 12px 14px;
-        border: 1px dashed var(--border);
-        border-radius: 10px;
-        background: var(--bg-side);
+      .ctag {
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent-2);
+        font-size: 10.5px;
+        font-weight: 600;
       }
-      .ghead { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-      .handle {
-        flex: none;
-        cursor: grab;
-        color: var(--fg-2);
-        padding: 2px 4px;
-        user-select: none;
-        font-size: 13px;
+      .cnum {
+        color: var(--faint);
+        font-size: 10.5px;
       }
-      input {
-        font: inherit;
-        font-size: 13px;
-        color: var(--fg);
-        background: var(--bg);
-        border: 1px solid var(--border);
+      .ops {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        display: flex;
+        gap: 3px;
+        opacity: 0;
+        transition: opacity 0.12s;
+      }
+      .cell:hover .ops,
+      .cell:focus-within .ops {
+        opacity: 1;
+      }
+      .op {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 0;
         border-radius: 6px;
-        padding: 5px 9px;
-        outline: none;
-        min-width: 0;
+        background: var(--elev);
+        color: var(--faint);
+        cursor: pointer;
+        transition: background 0.12s, color 0.12s;
       }
-      input:focus { border-color: var(--sel); }
-      .gname { font-weight: 600; flex: 0 1 240px; }
-      .lrow { display: flex; align-items: center; gap: 8px; padding: 3px 0; flex-wrap: wrap; }
-      .lname { flex: 1 1 160px; }
-      .lurl { flex: 2 1 280px; }
-      .del {
-        flex: none;
-        border: none;
+      .op:hover {
+        background: var(--border-2);
+        color: var(--fg);
+      }
+      .op.del:hover {
+        color: var(--danger);
+      }
+      .grip {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        z-index: 2;
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        color: #0a0b0f;
+        background: rgba(0, 0, 0, 0.14);
+        cursor: grab;
+        opacity: 0;
+        transition: opacity 0.12s;
+      }
+      .cell:hover .grip {
+        opacity: 1;
+      }
+      .grip:active {
+        cursor: grabbing;
+      }
+      .cell.dragging {
+        opacity: 0.4;
+      }
+      .cell.drop .card,
+      .grid.drop {
+        border-color: var(--accent);
+      }
+      .grid.drop {
+        border: 1px dashed var(--accent);
+        border-radius: var(--r);
+        margin: -4px;
+        padding: 4px;
+      }
+      .sec.drop .shead {
+        border-bottom-color: var(--accent);
+        box-shadow: 0 -2px 0 0 var(--accent);
+      }
+      .flash .card {
+        animation: flash 1.6s ease-out;
+      }
+      @keyframes flash {
+        0%,
+        45% {
+          border-color: var(--accent);
+          box-shadow: 0 0 0 3px var(--accent-soft);
+        }
+      }
+
+      .empty {
+        width: 100%;
+        padding: 22px;
+        border: 1px dashed var(--border-2);
+        border-radius: var(--r);
         background: none;
-        color: var(--fg-2);
-        font-size: 15px;
-        padding: 2px 7px;
-        line-height: 1;
+        color: var(--muted);
+        font: inherit;
+        font-size: 12.5px;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.15s, color 0.15s, background 0.15s;
       }
-      .del:hover { color: var(--danger); border: none; }
-      .addlink, #addgroup {
-        margin-top: 8px;
-        border-style: dashed;
-        color: var(--fg-2);
-        background: none;
+      .empty:hover {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+        color: var(--fg);
       }
-      #addgroup { display: block; width: 100%; margin-top: 20px; padding: 9px; }
-      .drop { box-shadow: 0 -2px 0 0 var(--sel); }
-      .gcard.drop { box-shadow: 0 -3px 0 0 var(--sel); }
+      .none {
+        padding: 26px 0;
+        color: var(--faint);
+        font-size: 12.5px;
+        text-align: center;
+      }
+      .foot {
+        margin-top: 16px;
+        color: var(--faint);
+        font-size: 11px;
+        text-align: right;
+      }
+      kbd {
+        padding: 1px 5px;
+        border: 1px solid var(--border-2);
+        border-bottom-width: 2px;
+        border-radius: 5px;
+        background: var(--surface);
+        font-family: var(--mono);
+        font-size: 10px;
+      }
+
+      @media (max-width: 760px) {
+        .page {
+          padding: 22px 14px 44px;
+        }
+        h1 {
+          font-size: 24px;
+        }
+        .tools {
+          width: 100%;
+          flex-wrap: wrap;
+        }
+        .search {
+          flex: 1 1 100%;
+        }
+        #q,
+        #q:focus {
+          width: 100%;
+        }
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .ops {
+          opacity: 0.72;
+        }
+        .iconbtn,
+        .grip {
+          opacity: 0.72;
+        }
+      }
     </style>
   </head>
   <body>
-    <header>
-      <span class="brand">123</span>
-      <span id="status"></span>
-      <button id="mode">编辑</button>
-    </header>
-    <main id="main"></main>
+    <div class="page">
+      <div class="wrap">
+        <header class="top">
+          <div class="logo">123</div>
+          <div class="titles">
+            <div class="trow">
+              <h1>123</h1>
+              <span class="pill" id="count">—</span>
+            </div>
+            <p class="sub">个人导航 · 页面内直接维护，改动自动落库</p>
+          </div>
+          <span id="status"></span>
+        </header>
+
+        <section class="panel">
+          <div class="phead">
+            <span class="ptitle">Bookmarks</span>
+            <div class="tools">
+              <div class="search">
+                <span class="ic" id="qic"></span>
+                <input id="q" type="search" placeholder="搜索名称 / 域名 / 分组" autocomplete="off" />
+                <button id="qx" type="button" title="清空"></button>
+              </div>
+              <div class="seg" id="sort" role="group" aria-label="排序方式"></div>
+              <button class="btn primary" id="add" type="button">添加</button>
+            </div>
+          </div>
+          <div class="chips" id="chips"></div>
+          <div id="slot"></div>
+          <div id="body"></div>
+        </section>
+
+        <p class="foot">
+          <kbd>/</kbd> 搜索 · <kbd>Enter</kbd> 打开首个结果 · <kbd>n</kbd> 添加 · <kbd>Esc</kbd> 取消
+        </p>
+      </div>
+    </div>
 
     <script>
+      "use strict";
       const $ = (id) => document.getElementById(id);
-      let doc = { version: 1, groups: [] };
+      const API = "/api/nav";
+      const LS_CLICKS = "jj-nav-clicks";
+      const LS_SORT = "jj-nav-sort";
+      const PALETTE = [
+        "#7c8bff",
+        "#2dd4bf",
+        "#4ade80",
+        "#fbbf24",
+        "#fb923c",
+        "#f87171",
+        "#f472b6",
+        "#c084fc",
+      ];
+      const SORTS = [
+        ["freq", "高频", "按本机点击次数"],
+        ["recent", "最近", "按添加时间"],
+        ["manual", "手动", "拖拽排序 / 分组视图"],
+      ];
+      const ICONS = {
+        search:
+          '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>',
+        plus: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+        pencil:
+          '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+        close:
+          '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+        grip: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>',
+      };
+
+      // doc = 唯一数据源（R2 nav.json）：links 为全局顺序，组内相对次序即手动排序；
+      // groups 仅记分组的展示顺序。点击次数是本机偏好，存 localStorage，不入库。
+      let doc = { version: 2, groups: [], links: [] };
       let etag = null;
-      let editing = false;
+      let clicks = readLocal(LS_CLICKS) || {};
+      let sortMode = SORTS.some((s) => s[0] === localStorage.getItem(LS_SORT))
+        ? localStorage.getItem(LS_SORT)
+        : "freq";
+      let filter = null; // null = 全部；"" = 未分组；其他 = 分组名
+      let query = "";
+      let form = null; // { index:number|null, name, url, group, color, err }
+      let flashUrl = null;
       let saveTimer = null; // 非 null = 有变更待保存
       let saving = false;
       let pendingSave = false;
       let statusTimer = null;
-      let drag = null; // {type:'link',gi,li} | {type:'group',gi}
+      let drag = null; // { kind:'link', i } | { kind:'group', g }
       let hoverEl = null;
-      let focusReq = null; // render 后聚焦目标 {gi, li?, field}
 
-      // ---- 加载 / 保存（整份文档 + etag CAS，600ms 防抖自动保存） ----
-      async function load() {
+      // ---------- 工具 ----------
+      function el(tag, cls, text) {
+        const e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text !== undefined) e.textContent = text;
+        return e;
+      }
+      function iconBtn(cls, name, title) {
+        const b = el("button", cls);
+        b.type = "button";
+        b.title = title;
+        b.setAttribute("aria-label", title);
+        b.innerHTML = ICONS[name];
+        return b;
+      }
+      function host(url) {
         try {
-          const r = await fetch("/api/nav", { cache: "no-store" });
-          if (!r.ok) throw new Error(r.status);
-          const j = await r.json();
-          doc = j.data && Array.isArray(j.data.groups) ? j.data : { version: 1, groups: [] };
-          etag = j.etag;
-          render();
+          return new URL(url).hostname.replace(/^www\./, "");
         } catch {
-          const m = $("main");
-          m.textContent = "";
-          const e = div("empty", "加载失败 ");
-          const b = document.createElement("button");
-          b.textContent = "重试";
-          b.addEventListener("click", load);
-          e.appendChild(b);
-          m.appendChild(e);
+          return "";
+        }
+      }
+      function validUrl(l) {
+        return !!l && /^https?:\/\//i.test(l.url || "");
+      }
+      function hash(s) {
+        let h = 0;
+        for (const c of s) h = (h * 31 + c.codePointAt(0)) >>> 0;
+        return h;
+      }
+      function autoColor(url) {
+        return PALETTE[hash(host(url) || url) % PALETTE.length];
+      }
+      function normColor(c) {
+        return /^#[0-9a-f]{6}$/i.test(c || "") ? c.toLowerCase() : "";
+      }
+      function readLocal(k) {
+        try {
+          return JSON.parse(localStorage.getItem(k) || "null");
+        } catch {
+          return null;
+        }
+      }
+      function writeLocal(k, v) {
+        try {
+          localStorage.setItem(k, JSON.stringify(v));
+        } catch {
+          /* 隐私模式 / 配额满：点击次数丢失不影响主功能 */
         }
       }
 
-      // 仅 http(s) 链接可展示 / 落库；空 url = 编辑中的草稿行，只存在于内存
-      function validUrl(l) {
-        return /^https?:\/\//i.test(l.url || "");
+      // ---------- 加载 / 迁移 / 保存 ----------
+      async function load() {
+        try {
+          const r = await fetch(API, { cache: "no-store" });
+          if (!r.ok) throw new Error(r.status);
+          const j = await r.json();
+          doc = migrate(j.data);
+          etag = j.etag;
+          pruneClicks();
+          renderAll();
+        } catch {
+          const b = $("body");
+          b.textContent = "";
+          const wrap = el("div", "none", "加载失败　");
+          const retry = el("button", "btn", "重试");
+          retry.type = "button";
+          retry.addEventListener("click", load);
+          wrap.appendChild(retry);
+          b.appendChild(wrap);
+        }
       }
 
-      function serializeGroups() {
-        return doc.groups.map((g) => ({
-          name: g.name || "",
-          links: (g.links || []).filter(validUrl).map((l) => ({ name: l.name || "", url: l.url })),
+      /// v1 { groups:[{name,links:[{name,url}]}] } → v2 { groups:[name], links:[{…,group,color,createdAt}] }
+      function migrate(d) {
+        const out = { version: 2, groups: [], links: [] };
+        if (!d || typeof d !== "object") return out;
+        if (Array.isArray(d.links)) {
+          out.groups = (Array.isArray(d.groups) ? d.groups : []).filter((g) => typeof g === "string" && g);
+          out.links = d.links.filter(validUrl).map((l) => ({
+            name: String(l.name || ""),
+            url: l.url,
+            group: typeof l.group === "string" ? l.group : "",
+            color: normColor(l.color) || autoColor(l.url),
+            createdAt: Number(l.createdAt) || 0,
+          }));
+        } else if (Array.isArray(d.groups)) {
+          for (const g of d.groups) {
+            if (!g || typeof g !== "object") continue;
+            const name = String(g.name || "");
+            for (const l of Array.isArray(g.links) ? g.links : []) {
+              if (!validUrl(l)) continue;
+              out.links.push({
+                name: String(l.name || ""),
+                url: l.url,
+                group: name,
+                color: autoColor(l.url),
+                createdAt: 0,
+              });
+            }
+          }
+        }
+        for (const l of out.links) if (l.group && !out.groups.includes(l.group)) out.groups.push(l.group);
+        out.groups = out.groups.filter((g) => out.links.some((l) => l.group === g));
+        return out;
+      }
+
+      function serialize() {
+        const links = doc.links.filter(validUrl).map((l) => ({
+          name: l.name || "",
+          url: l.url,
+          group: l.group || "",
+          color: normColor(l.color) || autoColor(l.url),
+          createdAt: Number(l.createdAt) || 0,
         }));
+        const groups = doc.groups.filter((g) => links.some((l) => l.group === g));
+        for (const l of links) if (l.group && !groups.includes(l.group)) groups.push(l.group);
+        return { version: 2, groups, links };
       }
 
       function scheduleSave() {
         clearTimeout(saveTimer);
-        saveTimer = setTimeout(saveNow, 600);
+        saveTimer = setTimeout(saveNow, 500);
       }
 
       async function saveNow() {
@@ -234,13 +957,9 @@
         try {
           const headers = { "content-type": "application/json" };
           if (etag) headers["If-Match"] = etag;
-          const r = await fetch("/api/nav", {
-            method: "PUT",
-            headers,
-            body: JSON.stringify({ version: 1, groups: serializeGroups() }),
-          });
+          const r = await fetch(API, { method: "PUT", headers, body: JSON.stringify(serialize()) });
           if (r.status === 409) {
-            alert("数据已在其他页面更新，将重新加载");
+            alert("数据已在其他页面更新，将重新加载最新内容");
             location.reload();
             return;
           }
@@ -268,7 +987,6 @@
       $("status").addEventListener("click", () => {
         if ($("status").className === "err") saveNow();
       });
-
       window.addEventListener("beforeunload", (e) => {
         if (saveTimer !== null || saving) {
           e.preventDefault();
@@ -276,282 +994,513 @@
         }
       });
 
-      // ---- 渲染 ----
-      function div(cls, text) {
-        const el = document.createElement("div");
-        el.className = cls;
-        if (text) el.textContent = text;
-        return el;
+      // ---------- 点击次数（本机） ----------
+      function bump(url) {
+        clicks[url] = (clicks[url] || 0) + 1;
+        writeLocal(LS_CLICKS, clicks);
+      }
+      function pruneClicks() {
+        const live = new Set(doc.links.map((l) => l.url));
+        let changed = false;
+        for (const k of Object.keys(clicks)) {
+          if (!live.has(k)) {
+            delete clicks[k];
+            changed = true;
+          }
+        }
+        if (changed) writeLocal(LS_CLICKS, clicks);
       }
 
-      function render() {
-        const m = $("main");
-        m.textContent = "";
-        $("mode").textContent = editing ? "完成" : "编辑";
-        if (editing) renderEdit(m);
-        else renderView(m);
-        if (focusReq) {
-          const li = focusReq.li !== undefined ? `[data-li="${focusReq.li}"]` : "";
-          const el = m.querySelector(`[data-gi="${focusReq.gi}"]${li} .${focusReq.field}`);
-          if (el) el.focus();
-          focusReq = null;
+      // ---------- 视图数据 ----------
+      function groupCounts() {
+        const m = new Map();
+        for (const l of doc.links) {
+          if (!validUrl(l)) continue;
+          const g = l.group || "";
+          m.set(g, (m.get(g) || 0) + 1);
+        }
+        return m;
+      }
+      function orderedGroups() {
+        const c = groupCounts();
+        const gs = doc.groups.filter((g) => c.get(g));
+        if (c.get("")) gs.push("");
+        return gs;
+      }
+      function ensureGroup(g) {
+        if (g && !doc.groups.includes(g)) doc.groups.push(g);
+      }
+      function matches(l, q) {
+        return (
+          (l.name || "").toLowerCase().includes(q) ||
+          l.url.toLowerCase().includes(q) ||
+          (l.group || "").toLowerCase().includes(q)
+        );
+      }
+      /// 返回 [{ l, i }]（i = doc.links 全局下标），已按当前 filter / query / sort 处理
+      function visible() {
+        let out = doc.links.map((l, i) => ({ l, i })).filter((x) => validUrl(x.l));
+        if (filter !== null) out = out.filter((x) => (x.l.group || "") === filter);
+        if (query) {
+          const q = query.toLowerCase();
+          out = out.filter((x) => matches(x.l, q));
+        }
+        if (sortMode === "freq") {
+          out.sort((a, b) => (clicks[b.l.url] || 0) - (clicks[a.l.url] || 0) || a.i - b.i);
+        } else if (sortMode === "recent") {
+          out.sort((a, b) => (b.l.createdAt || 0) - (a.l.createdAt || 0) || a.i - b.i);
+        }
+        return out;
+      }
+      const grouped = () => sortMode === "manual" && filter === null && !query;
+      const canDrag = () => sortMode === "manual" && !query;
+
+      // ---------- 渲染 ----------
+      function renderAll() {
+        renderSort();
+        renderChips();
+        renderSlot();
+        renderList();
+      }
+
+      function renderSort() {
+        const box = $("sort");
+        box.textContent = "";
+        for (const [key, label, tip] of SORTS) {
+          const b = el("button", key === sortMode ? "on" : "", label);
+          b.type = "button";
+          b.title = tip;
+          b.setAttribute("aria-pressed", String(key === sortMode));
+          b.addEventListener("click", () => {
+            sortMode = key;
+            localStorage.setItem(LS_SORT, key);
+            renderSort();
+            renderList();
+          });
+          box.appendChild(b);
         }
       }
 
-      function renderView(m) {
-        if (doc.groups.length === 0) {
-          m.appendChild(div("empty", "空空如也 — 点右上「编辑」开始添加"));
+      function renderChips() {
+        const box = $("chips");
+        box.textContent = "";
+        const counts = groupCounts();
+        const total = doc.links.filter(validUrl).length;
+        $("count").textContent = total ? `${total} 个链接 · ${orderedGroups().filter(Boolean).length} 组` : "空";
+        if (!total) return;
+        box.appendChild(chip("全部", total, null));
+        for (const g of orderedGroups()) chip(g || "未分组", counts.get(g), g, box);
+        function chip(label, n, key, parent) {
+          const b = el("button", "chip" + (filter === key ? " on" : ""));
+          b.type = "button";
+          b.setAttribute("aria-pressed", String(filter === key));
+          b.appendChild(el("span", "", label));
+          b.appendChild(el("span", "n", String(n)));
+          b.addEventListener("click", () => {
+            filter = filter === key ? null : key;
+            renderChips();
+            renderList();
+          });
+          if (parent) parent.appendChild(b);
+          return b;
+        }
+      }
+
+      function renderList() {
+        const body = $("body");
+        body.textContent = "";
+        const items = visible();
+
+        if (!doc.links.filter(validUrl).length) {
+          const b = el("button", "empty", "还没有链接 —— 点这里添加第一条");
+          b.type = "button";
+          b.addEventListener("click", () => openForm(null));
+          body.appendChild(b);
           return;
         }
-        for (const g of doc.groups) {
-          const sec = div("group");
-          const h = document.createElement("h2");
-          h.textContent = g.name || "未命名";
-          sec.appendChild(h);
-          const links = (g.links || []).filter(validUrl);
-          if (links.length === 0) {
-            sec.appendChild(div("none", "（空）"));
-          } else {
-            const chips = div("chips");
-            for (const l of links) chips.appendChild(chip(l));
-            sec.appendChild(chips);
-          }
-          m.appendChild(sec);
+        if (!items.length) {
+          body.appendChild(el("div", "none", query ? `没有匹配「${query}」的链接` : "该分组为空"));
+          return;
+        }
+
+        if (grouped()) {
+          for (const g of orderedGroups()) body.appendChild(section(g, items.filter((x) => (x.l.group || "") === g)));
+        } else {
+          const grid = el("div", "grid");
+          for (const x of items) grid.appendChild(cell(x, x.l.group || ""));
+          body.appendChild(grid);
+        }
+        if (flashUrl) {
+          const target = body.querySelector(".flash");
+          if (target) target.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          flashUrl = null;
         }
       }
 
-      function chip(l) {
-        const a = document.createElement("a");
-        a.className = "chip";
-        a.href = l.url;
+      function section(g, items) {
+        const sec = el("div", "sec");
+        const head = el("div", "shead");
+        if (g) {
+          head.appendChild(gripFor(sec, { kind: "group", g }, "拖拽调整分组顺序"));
+        } else {
+          const spacer = el("span", "grip ghost"); // 「未分组」不可排序，占位保持标题对齐
+          spacer.innerHTML = ICONS.grip;
+          head.appendChild(spacer);
+        }
+        const title = el("h2", "", g || "未分组");
+        head.appendChild(title);
+        head.appendChild(el("span", "n", String(items.length)));
+        if (g) {
+          const ren = iconBtn("iconbtn", "pencil", "重命名分组");
+          ren.addEventListener("click", () => startRename(head, title, ren, g));
+          head.appendChild(ren);
+        }
+        sec.appendChild(head);
+
+        const grid = el("div", "grid");
+        for (const x of items) grid.appendChild(cell(x, g));
+        dropZone(grid, "link", () => moveLink(drag.i, null, g));
+        sec.appendChild(grid);
+
+        // 分组整体拖拽：落在本 section 上 = 插到本组之前
+        sec.addEventListener("dragover", (e) => {
+          if (drag?.kind !== "group" || drag.g === g || !g) return;
+          e.preventDefault();
+          setHover(sec);
+        });
+        sec.addEventListener("drop", (e) => {
+          if (drag?.kind !== "group" || drag.g === g || !g) return;
+          e.preventDefault();
+          moveGroup(drag.g, g);
+        });
+        return sec;
+      }
+
+      function startRename(head, title, btn, g) {
+        const input = el("input", "srename");
+        input.value = g;
+        title.replaceWith(input);
+        btn.style.display = "none";
+        input.focus();
+        input.select();
+        let done = false;
+        const finish = (commit) => {
+          if (done) return;
+          done = true;
+          const next = input.value.trim();
+          if (commit && next && next !== g) renameGroup(g, next);
+          else renderList();
+        };
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") finish(true);
+          if (e.key === "Escape") finish(false);
+        });
+        input.addEventListener("blur", () => finish(true));
+      }
+
+      function cell(x, group) {
+        const c = el("div", "cell");
+        if (flashUrl && x.l.url === flashUrl) c.classList.add("flash");
+
+        const a = el("a", "card");
+        a.href = x.l.url;
         a.target = "_blank";
         a.rel = "noopener noreferrer";
-        a.title = l.url;
-        const name = (l.name || "").trim() || host(l.url) || l.url;
-        a.appendChild(mark(name, l.url));
-        const n = document.createElement("span");
-        n.className = "name";
-        n.textContent = name;
-        a.appendChild(n);
-        return a;
-      }
+        a.draggable = false;
+        const name = (x.l.name || "").trim() || host(x.l.url) || x.l.url;
+        a.title = `${name}\n${x.l.url}`;
 
-      function mark(name, url) {
-        const el = document.createElement("span");
-        el.className = "mark";
-        el.textContent = [...name][0].toUpperCase();
-        el.style.background = `hsl(${hue(host(url) || name)} 58% 46%)`;
-        return el;
-      }
+        const m = el("span", "mark", [...name][0].toUpperCase());
+        m.style.background = normColor(x.l.color) || autoColor(x.l.url);
+        a.appendChild(m);
 
-      function hue(s) {
-        let h = 0;
-        for (const c of s) h = (h * 31 + c.codePointAt(0)) % 360;
-        return h;
-      }
+        const b = el("span", "cbody");
+        b.appendChild(el("span", "cname", name));
+        const meta = el("span", "cmeta");
+        const h = host(x.l.url);
+        if (h && h !== name) meta.appendChild(el("span", "chost", h));
+        if (x.l.group && !grouped()) meta.appendChild(el("span", "ctag", "#" + x.l.group));
+        const n = clicks[x.l.url] || 0;
+        if (n) meta.appendChild(el("span", "cnum", `${n} 次`));
+        b.appendChild(meta);
+        a.appendChild(b);
 
-      function host(url) {
-        try {
-          return new URL(url).hostname.replace(/^www\./, "");
-        } catch {
-          return "";
-        }
-      }
+        const hit = () => bump(x.l.url);
+        a.addEventListener("click", hit);
+        a.addEventListener("auxclick", (e) => e.button === 1 && hit());
+        c.appendChild(a);
 
-      // ---- 编辑模式 ----
-      function renderEdit(m) {
-        doc.groups.forEach((g, gi) => m.appendChild(groupCard(g, gi)));
-        const add = document.createElement("button");
-        add.id = "addgroup";
-        add.textContent = "＋ 新分组";
-        add.addEventListener("click", () => {
-          doc.groups.push({ name: "", links: [] });
-          focusReq = { gi: doc.groups.length - 1, field: "gname" };
-          render();
+        if (canDrag()) c.appendChild(gripFor(c, { kind: "link", i: x.i }, "拖拽排序 / 移动到其他分组"));
+
+        const ops = el("div", "ops");
+        const edit = iconBtn("op", "pencil", "编辑");
+        edit.addEventListener("click", () => openForm(x.i));
+        const del = iconBtn("op del", "close", "删除");
+        del.addEventListener("click", () => {
+          if (!confirm(`删除「${name}」？`)) return;
+          doc.links.splice(x.i, 1);
+          renderAll();
           scheduleSave();
         });
-        // 拖分组到末尾的落点
-        dropTarget(add, "group", () => moveGroup(drag.gi, doc.groups.length));
-        m.appendChild(add);
+        ops.append(edit, del);
+        c.appendChild(ops);
+
+        // 链接落在本 cell 上 = 插到它之前
+        dropZone(c, "link", () => moveLink(drag.i, x.i, group));
+        return c;
       }
 
-      function groupCard(g, gi) {
-        const card = div("gcard");
-        card.dataset.gi = gi;
-
-        const head = div("ghead");
-        head.appendChild(dragHandle(card, { type: "group", gi }));
-        const name = document.createElement("input");
-        name.className = "gname";
-        name.placeholder = "分组名";
-        name.value = g.name || "";
-        name.addEventListener("input", () => {
-          g.name = name.value;
-          scheduleSave();
-        });
-        head.appendChild(name);
-        head.appendChild(delButton(() => {
-          const n = (g.links || []).length;
-          if (n && !confirm(`删除分组「${g.name || "未命名"}」及其 ${n} 条链接？`)) return;
-          doc.groups.splice(gi, 1);
-          render();
-          scheduleSave();
-        }));
-        card.appendChild(head);
-
-        (g.links || []).forEach((l, li) => card.appendChild(linkRow(g, gi, l, li)));
-
-        const add = document.createElement("button");
-        add.className = "addlink";
-        add.textContent = "＋ 链接";
-        add.addEventListener("click", () => {
-          g.links.push({ name: "", url: "" });
-          focusReq = { gi, li: g.links.length - 1, field: "lname" };
-          render();
-        });
-        // 拖链接到本组末尾的落点
-        dropTarget(add, "link", () => moveLink(drag.gi, drag.li, gi, null));
-        card.appendChild(add);
-
-        // 组卡片本身：分组拖拽 = 插到本组前；链接拖到卡片空白处 = 追加到本组
-        card.addEventListener("dragover", (e) => {
-          if (!drag) return;
-          e.preventDefault();
-          setHover(card);
-        });
-        card.addEventListener("drop", (e) => {
-          if (!drag) return;
-          e.preventDefault();
-          if (drag.type === "group") moveGroup(drag.gi, gi);
-          else moveLink(drag.gi, drag.li, gi, null);
-        });
-        return card;
+      // ---------- 添加 / 编辑表单 ----------
+      function openForm(index) {
+        const l = index === null ? null : doc.links[index];
+        form = {
+          index,
+          name: l ? l.name || "" : "",
+          url: l ? l.url : "",
+          group: l ? l.group || "" : filter || "",
+          color: l ? normColor(l.color) || autoColor(l.url) : "",
+          err: "",
+        };
+        renderSlot();
+        const first = $("slot").querySelector(l ? ".in.name" : ".in.url");
+        if (first) first.focus();
+      }
+      function closeForm() {
+        form = null;
+        renderSlot();
       }
 
-      function linkRow(g, gi, l, li) {
-        const row = div("lrow");
-        row.dataset.gi = gi;
-        row.dataset.li = li;
-        row.appendChild(dragHandle(row, { type: "link", gi, li }));
+      function renderSlot() {
+        const slot = $("slot");
+        slot.textContent = "";
+        if (!form) return;
 
-        const name = document.createElement("input");
-        name.className = "lname";
-        name.placeholder = "名称";
-        name.value = l.name || "";
-        name.addEventListener("input", () => {
-          l.name = name.value;
-          scheduleSave();
-        });
-        row.appendChild(name);
-
-        const url = document.createElement("input");
-        url.className = "lurl";
+        const f = el("form", "editor");
+        const r1 = el("div", "frow");
+        const name = el("input", "in name");
+        name.placeholder = "名称（留空取域名）";
+        name.value = form.name;
+        name.addEventListener("input", () => (form.name = name.value));
+        const url = el("input", "in url");
         url.placeholder = "https://…";
-        url.value = l.url || "";
-        url.addEventListener("input", () => {
-          l.url = url.value;
-          scheduleSave();
-        });
-        url.addEventListener("change", () => {
-          let v = url.value.trim();
-          if (v && !/^[a-z][a-z0-9+.-]*:\/\//i.test(v)) v = "https://" + v;
-          l.url = v;
-          url.value = v;
-          if (!(l.name || "").trim() && host(v)) {
-            l.name = host(v);
-            name.value = l.name;
-          }
-          scheduleSave();
-        });
-        row.appendChild(url);
+        url.value = form.url;
+        url.addEventListener("input", () => (form.url = url.value));
+        r1.append(name, url);
 
-        row.appendChild(delButton(() => {
-          if (!confirm(`删除「${(l.name || "").trim() || l.url || "空行"}」？`)) return;
-          g.links.splice(li, 1);
-          render();
-          scheduleSave();
-        }));
+        const r2 = el("div", "frow");
+        const group = el("input", "in group");
+        group.placeholder = "分组（留空 = 未分组）";
+        group.value = form.group;
+        group.setAttribute("list", "grouplist");
+        group.addEventListener("input", () => (form.group = group.value));
+        const list = el("datalist");
+        list.id = "grouplist";
+        for (const g of doc.groups) {
+          const o = el("option");
+          o.value = g;
+          list.appendChild(o);
+        }
+        const sws = el("div", "sws");
+        for (const c of PALETTE) {
+          const s = el("button", "sw" + (form.color === c ? " on" : ""));
+          s.type = "button";
+          s.style.background = c;
+          s.title = c;
+          s.addEventListener("click", () => {
+            form.color = c;
+            renderSlot();
+          });
+          sws.appendChild(s);
+        }
+        r2.append(group, list, sws);
 
-        // 拖链接到本行 = 插到本行前
-        dropTarget(row, "link", () => moveLink(drag.gi, drag.li, gi, li));
-        return row;
+        const act = el("div", "fact");
+        const ok = el("button", "btn primary", form.index === null ? "添加" : "保存");
+        ok.type = "submit";
+        const cancel = el("button", "btn", "取消");
+        cancel.type = "button";
+        cancel.addEventListener("click", closeForm);
+        act.append(ok, cancel);
+        if (form.err) act.appendChild(el("span", "ferr", form.err));
+        act.appendChild(el("span", "fhint", "未选颜色则按域名自动配色"));
+
+        f.append(r1, r2, act);
+        f.addEventListener("submit", (e) => {
+          e.preventDefault();
+          submitForm();
+        });
+        slot.appendChild(f);
       }
 
-      function delButton(onclick) {
-        const b = document.createElement("button");
-        b.className = "del";
-        b.textContent = "✕";
-        b.title = "删除";
-        b.addEventListener("click", onclick);
-        return b;
+      function submitForm() {
+        let url = (form.url || "").trim();
+        if (url && !/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) url = "https://" + url;
+        if (!/^https?:\/\//i.test(url)) {
+          form.err = "请填写 http(s) 链接";
+          renderSlot();
+          return;
+        }
+        const name = (form.name || "").trim() || host(url) || url;
+        const group = (form.group || "").trim();
+        const color = normColor(form.color) || autoColor(url);
+        ensureGroup(group);
+        if (form.index === null) {
+          doc.links.push({ name, url, group, color, createdAt: Date.now() });
+          filter = null;
+          query = "";
+          $("q").value = "";
+          $("qx").style.display = "none";
+        } else {
+          Object.assign(doc.links[form.index], { name, url, group, color });
+        }
+        flashUrl = url;
+        form = null;
+        renderAll();
+        scheduleSave();
       }
 
-      // ---- 拖拽排序 ----
-      function dragHandle(ghost, info) {
-        const h = document.createElement("span");
-        h.className = "handle";
-        h.textContent = "⠿";
-        h.title = "拖拽排序";
-        h.draggable = true;
-        h.addEventListener("dragstart", (e) => {
+      // ---------- 拖拽 ----------
+      function gripFor(ghost, info, title) {
+        const g = el("span", "grip");
+        g.innerHTML = ICONS.grip;
+        g.title = title;
+        g.draggable = true;
+        g.addEventListener("dragstart", (e) => {
           drag = info;
+          ghost.classList.add("dragging");
           e.dataTransfer.effectAllowed = "move";
           e.dataTransfer.setData("text/plain", "");
-          e.dataTransfer.setDragImage(ghost, 12, 12);
+          e.dataTransfer.setDragImage(ghost, 14, 14);
         });
-        h.addEventListener("dragend", () => {
+        g.addEventListener("dragend", () => {
+          ghost.classList.remove("dragging");
           drag = null;
           setHover(null);
         });
-        return h;
+        return g;
       }
 
-      function dropTarget(el, type, action) {
-        el.addEventListener("dragover", (e) => {
-          if (!drag || drag.type !== type) return;
+      function dropZone(node, kind, action) {
+        node.addEventListener("dragover", (e) => {
+          if (drag?.kind !== kind) return;
           e.preventDefault();
           e.stopPropagation();
-          setHover(el);
+          setHover(node);
         });
-        el.addEventListener("drop", (e) => {
-          if (!drag || drag.type !== type) return;
+        node.addEventListener("drop", (e) => {
+          if (drag?.kind !== kind) return;
           e.preventDefault();
           e.stopPropagation();
           action();
         });
       }
 
-      function setHover(el) {
-        if (hoverEl && hoverEl !== el) hoverEl.classList.remove("drop");
-        hoverEl = el;
-        if (el) el.classList.add("drop");
+      function setHover(node) {
+        if (hoverEl && hoverEl !== node) hoverEl.classList.remove("drop");
+        hoverEl = node;
+        if (node) node.classList.add("drop");
       }
 
-      function moveLink(fromGi, fromLi, toGi, toLi) {
+      /// before = 目标 cell 的全局下标（插到其前）；null = 追加到 group 末尾
+      function moveLink(from, before, group) {
         setHover(null);
-        const [l] = doc.groups[fromGi].links.splice(fromLi, 1);
-        let idx = toLi === null ? doc.groups[toGi].links.length : toLi;
-        if (fromGi === toGi && toLi !== null && fromLi < toLi) idx--;
-        doc.groups[toGi].links.splice(idx, 0, l);
+        const [l] = doc.links.splice(from, 1);
+        l.group = group;
+        ensureGroup(group);
+        let idx;
+        if (before === null) {
+          let last = -1;
+          doc.links.forEach((x, i) => {
+            if ((x.group || "") === group) last = i;
+          });
+          idx = last < 0 ? doc.links.length : last + 1;
+        } else {
+          idx = before > from ? before - 1 : before;
+        }
+        doc.links.splice(idx, 0, l);
         drag = null;
-        render();
+        renderAll();
         scheduleSave();
       }
 
-      function moveGroup(fromGi, toGi) {
+      function moveGroup(from, to) {
         setHover(null);
-        const [g] = doc.groups.splice(fromGi, 1);
-        doc.groups.splice(fromGi < toGi ? toGi - 1 : toGi, 0, g);
+        const gs = doc.groups;
+        const fi = gs.indexOf(from);
+        if (fi < 0) return;
+        gs.splice(fi, 1);
+        const ti = gs.indexOf(to);
+        gs.splice(ti < 0 ? gs.length : ti, 0, from);
         drag = null;
-        render();
+        renderList();
         scheduleSave();
       }
 
-      // ---- 模式切换 ----
-      $("mode").addEventListener("click", () => {
-        editing = !editing;
-        if (!editing && saveTimer !== null) saveNow(); // 退出编辑即冲刷待存变更
-        render();
+      function renameGroup(from, to) {
+        for (const l of doc.links) if ((l.group || "") === from) l.group = to;
+        const gs = doc.groups;
+        const i = gs.indexOf(from);
+        if (i >= 0) {
+          if (gs.includes(to)) gs.splice(i, 1);
+          else gs[i] = to;
+        } else ensureGroup(to);
+        if (filter === from) filter = to;
+        renderAll();
+        scheduleSave();
+      }
+
+      // ---------- 搜索 / 快捷键 ----------
+      $("qic").innerHTML = ICONS.search;
+      $("qx").innerHTML = ICONS.close;
+      $("add").prepend(
+        (() => {
+          const s = el("span");
+          s.innerHTML = ICONS.plus;
+          return s;
+        })()
+      );
+      $("add").addEventListener("click", () => (form ? closeForm() : openForm(null)));
+
+      $("q").addEventListener("input", () => {
+        query = $("q").value.trim();
+        $("qx").style.display = query ? "grid" : "none";
+        renderList();
+      });
+      $("q").addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        const first = visible()[0];
+        if (!first) return;
+        bump(first.l.url);
+        window.open(first.l.url, "_blank", "noopener");
+      });
+      $("qx").addEventListener("click", clearQuery);
+      function clearQuery() {
+        query = "";
+        $("q").value = "";
+        $("qx").style.display = "none";
+        renderList();
+        $("q").focus();
+      }
+
+      document.addEventListener("keydown", (e) => {
+        const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || "");
+        if (e.key === "Escape") {
+          if (form) closeForm();
+          else if (query) clearQuery();
+          else if (typing) document.activeElement.blur();
+          return;
+        }
+        if (typing) return;
+        if (e.key === "/" || ((e.metaKey || e.ctrlKey) && e.key === "k")) {
+          e.preventDefault();
+          $("q").focus();
+          $("q").select();
+        }
+        if (e.key === "n" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+          e.preventDefault();
+          openForm(null);
+        }
       });
 
       load();

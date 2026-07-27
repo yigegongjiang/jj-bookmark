@@ -25,6 +25,10 @@
   - 运行：`open jj-bookmark-app/build/jj-bookmark.app`
   - 验证跨进程刷新：改动 `~/.config/jj-bookmark/bookmarks.json` 后 App 无需重启即刷新（FSEvents）
 - Web（`jj-bookmark-web/`）：AI 跳过本地运行时调试 —— 起 `wrangler dev` / 塞本地 R2 / curl / 浏览器验证在当前 project 均耗时且无收益；代码变更直接进 §3 提交，push master 由 §6 GHA 自动部署，出错人类自行发现。
+  - 例外 = 页面视觉 / 交互改版（布局、样式、拖拽、快捷键）或改数据结构：线上受 Access 保护、AI 无法登录复核，MUST 本地验证后再提交
+  - `npx wrangler dev --port 8791 --var CF_ACCESS_TEAM_DOMAIN: --var CF_ACCESS_AUD:`  # 置空 vars 跳过 JWT 校验
+  - `npx wrangler r2 object put jj-bookmark/nav.json --file <seed>.json --local`  # 塞本地 R2 种子数据（含旧版结构以验迁移）
+  - 渲染 / 交互复核走 ego-browser skill（截图 + 合成 DragEvent 验拖拽）；curl 打 `/api/nav` 验白名单与 `If-Match` 409
 
 # 发布
 

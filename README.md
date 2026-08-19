@@ -12,7 +12,7 @@
 
 ## 使用
 
-- CLI：`jj-bookmark-cli/` 构建出二进制 `jj-bookmark`；`apply <URL|ID>` 统一保存 / 编辑，`apply <ID> --delete` 删除，`ls [KEYWORD]` 统一列表 / 搜索；`--source <NAME>` / `--all` 为根选项，其他命令见 `jj-bookmark --help`（仅英文）。
+- CLI：`jj-bookmark-cli/` 构建出二进制 `jj-bookmark`；`apply <URL|ID>` 统一保存 / 编辑，`apply <ID> --delete` 删除，`ls [KEYWORD]` 统一列表 / 搜索；根选项只有 `--source <NAME>`（省略 = 全部 source，`apply <URL>` 省略时落 `default`），其他命令见 `jj-bookmark --help`（仅英文）。
 - App：`jj-bookmark-app/` 由 `package.sh` 组装出 macOS `.app`，桌面端全量浏览 / 编辑，记住窗口、左侧栏尺寸及展开 / 选中路径；bundle 内嵌同版本 CLI 作运行核心，`~/.local/bin/jj-bookmark` 可选安装为指向它的符号链接。偏好设置（⌘,）含闲置自动退出（默认 1 分钟，可选 1 / 5 / 10 / 自定义）、CLI 安装·重装、检查更新。界面随系统语言切换（中 / 日 / 英，非中日语系默认英文）。
 - Web：`jj-bookmark-web/` = Cloudflare Worker + R2，两张页：只读预览页（folder 树 / 搜索 / 排序，数据由 `jj-bookmark push` 单向推送，web 无写入 / 无 pull）+ 个人导航页 `123.yigegongjiang.com`（卡片面板：搜索 / 分组筛选 / 高频·最近·手动排序 / 拖拽 / 内联增删改，R2 为唯一数据源）；均 Google 登录访问。详见 [jj-bookmark-web/README.md](./jj-bookmark-web/README.md)。
 - 数据文件：`~/.config/jj-bookmark/bookmarks.json`（pretty JSON；顶层 `sources` 分组，条目不重复保存 source；可手改 / `jq` 处理）。

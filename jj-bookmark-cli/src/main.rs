@@ -22,7 +22,7 @@ use store::{Paths, mutate, read_store};
     version,
     about = "Bookmark tool",
     disable_help_subcommand = true,
-    before_help = "TL;DR — save a bookmark:\n  1. Search: jj-bookmark --all ls <DOMAIN>; same domain = strong match; ask: add or edit <ID>?\n  2. Pick the closest path from jj-bookmark folders; levels are joined by `::` with no spaces (e.g. AI::claude-code); infer title and useful metadata.\n  3. jj-bookmark apply <URL> --title <TITLE> --folder <PATH> [--note <NOTE>] [--excerpt <TEXT>]\n     <URL> = the exact current page URL, verbatim (full path + query); NEVER substitute the bare domain or a trimmed form.\n  Edit: jj-bookmark --all apply <ID> <fields>; delete: jj-bookmark --all apply <ID> --delete."
+    before_help = "TL;DR — save a bookmark:\n  1. Search: jj-bookmark ls <DOMAIN>; same domain = strong match; ask: add or edit <ID>?\n  2. Pick the closest path from jj-bookmark folders; levels are joined by `::` with no spaces (e.g. AI::claude-code); infer title and useful metadata.\n  3. jj-bookmark apply <URL> --title <TITLE> --folder <PATH> [--note <NOTE>] [--excerpt <TEXT>]\n     <URL> = the exact current page URL, verbatim (full path + query); NEVER substitute the bare domain or a trimmed form.\n  Edit: jj-bookmark apply <ID> <fields>; delete: jj-bookmark apply <ID> --delete."
 )]
 struct Cli {
     #[command(flatten)]
@@ -33,12 +33,9 @@ struct Cli {
 
 #[derive(Args, Clone, Debug)]
 struct ScopeArgs {
-    /// Target source (default: default)
-    #[arg(long, value_name = "NAME", value_parser = parse_source, conflicts_with = "all")]
+    /// Narrow to one source (default: all sources; `apply <URL>` without it adds to `default`)
+    #[arg(long, value_name = "NAME", value_parser = parse_source)]
     source: Option<String>,
-    /// Target all sources
-    #[arg(long)]
-    all: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -49,15 +46,12 @@ enum Scope {
 
 impl ScopeArgs {
     fn is_explicit(&self) -> bool {
-        self.source.is_some() || self.all
+        self.source.is_some()
     }
 
+    /// 无 `--source` = 全部 source（读与按 ID 写的常态；id 全局唯一，见 `unique_id`）。
     fn resolve(self) -> Scope {
-        if self.all {
-            Scope::All
-        } else {
-            Scope::Source(self.source.unwrap_or_else(|| DEFAULT_SOURCE.to_owned()))
-        }
+        self.source.map_or(Scope::All, Scope::Source)
     }
 }
 
@@ -194,7 +188,7 @@ fn main() -> Result<()> {
         Command::Folders => cmd_folders(&paths, scope),
         Command::Sources => {
             if explicit_scope {
-                bail!("--source/--all cannot be used with sources");
+                bail!("--source cannot be used with sources; it always lists every source");
             }
             cmd_sources(&paths)
         }
@@ -202,7 +196,7 @@ fn main() -> Result<()> {
         Command::Mv { old, new } => cmd_mv(&paths, old, new, scope),
         Command::Push => {
             if explicit_scope {
-                bail!("--source/--all cannot be used with push; push always uploads all sources");
+                bail!("--source cannot be used with push; push always uploads all sources");
             }
             cmd_push(&paths)
         }
@@ -218,8 +212,10 @@ fn cmd_add(
     excerpt: Option<String>,
     scope: Scope,
 ) -> Result<()> {
-    let Scope::Source(source) = scope else {
-        bail!("--all cannot be used when adding a bookmark");
+    // 新增须有唯一落点：无 `--source` 落 DEFAULT_SOURCE（读侧的「全部」在此收敛为默认组）。
+    let source = match scope {
+        Scope::Source(source) => source,
+        Scope::All => DEFAULT_SOURCE.to_owned(),
     };
     let title = title.unwrap_or_else(|| url.clone()); // 无 --title 时用 URL 占位
     let folder = folder.unwrap_or_default();
@@ -410,10 +406,11 @@ fn cmd_rm(paths: &Paths, id: i64, scope: Scope) -> Result<()> {
 }
 
 fn cmd_mv(paths: &Paths, old: String, new: String, scope: Scope) -> Result<()> {
-    let n = mutate(paths, |store| {
+    let (n, touched) = mutate(paths, |store| {
         let prefix = format!("{old}{FOLDER_SEP}");
         let now = now_millis();
         let mut moved = 0;
+        let mut touched: Vec<String> = Vec::new();
         for (source, bookmarks) in &mut store.sources {
             if !scope.includes_source(source) {
                 continue;
@@ -439,14 +436,15 @@ fn cmd_mv(paths: &Paths, old: String, new: String, scope: Scope) -> Result<()> {
                 for folder in &relocated {
                     ensure_leaf_placement(folder, all.iter().copied())?;
                 }
+                touched.push(format!("{source}({})", relocated.len()));
             }
         }
         if moved == 0 {
             bail!("no folder matches {old:?}");
         }
-        Ok(moved)
+        Ok((moved, touched))
     })?;
-    println!("Moved {n} bookmark(s): {old} → {new}");
+    println!("Moved {n} bookmark(s): {old} → {new} [{}]", touched.join(", "));
     Ok(())
 }
 
@@ -539,7 +537,7 @@ fn apply_edit_fields(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clap::{CommandFactory, error::ErrorKind};
+    use clap::CommandFactory;
     use std::fs;
 
     fn temp_paths(tag: &str) -> Paths {
@@ -552,33 +550,39 @@ mod tests {
     }
 
     #[test]
-    fn scope_is_root_only_and_defaults_to_default() {
+    fn scope_is_root_only_and_defaults_to_all() {
         let cli = Cli::try_parse_from(["jj-bookmark", "ls"]).unwrap();
-        assert_eq!(
-            cli.scope.resolve(),
-            Scope::Source(DEFAULT_SOURCE.to_owned())
-        );
+        assert_eq!(cli.scope.resolve(), Scope::All);
 
         let cli = Cli::try_parse_from(["jj-bookmark", "--source", "safari", "ls"]).unwrap();
         assert_eq!(cli.scope.resolve(), Scope::Source("safari".to_owned()));
         assert!(Cli::try_parse_from(["jj-bookmark", "ls", "--source", "safari"]).is_err());
+        assert!(Cli::try_parse_from(["jj-bookmark", "--all", "ls"]).is_err());
 
         let command = Cli::command();
         assert!(command.get_arguments().any(|arg| arg.get_id() == "source"));
-        assert!(command.get_arguments().any(|arg| arg.get_id() == "all"));
+        assert!(command.get_arguments().all(|arg| arg.get_id() != "all"));
         let ls = command.find_subcommand("ls").unwrap();
-        assert!(
-            ls.get_arguments()
-                .all(|arg| arg.get_id() != "source" && arg.get_id() != "all")
-        );
+        assert!(ls.get_arguments().all(|arg| arg.get_id() != "source"));
     }
 
+    /// 读侧默认「全部 source」，但新增须有唯一落点 → 无 `--source` 落 default。
     #[test]
-    fn source_and_all_are_mutually_exclusive() {
-        let error = Cli::try_parse_from(["jj-bookmark", "--source", "safari", "--all", "ls"])
-            .err()
-            .expect("scope conflict must fail");
-        assert_eq!(error.kind(), ErrorKind::ArgumentConflict);
+    fn add_without_source_lands_in_default() {
+        let paths = temp_paths("add-default");
+        cmd_add(
+            &paths,
+            "https://example.com".into(),
+            None,
+            None,
+            None,
+            None,
+            Scope::All,
+        )
+        .unwrap();
+        let store = read_store(&paths).unwrap();
+        assert_eq!(store.sources.keys().collect::<Vec<_>>(), [DEFAULT_SOURCE]);
+        let _ = fs::remove_dir_all(&paths.dir);
     }
 
     #[test]
@@ -613,6 +617,26 @@ mod tests {
             let cli = Cli::try_parse_from(args).unwrap();
             assert!(matches!(cli.cmd, Command::Apply { .. }));
         }
+    }
+
+    #[test]
+    fn edit_finds_id_across_sources_when_scope_is_all() {
+        let paths = temp_paths("edit-all");
+        seed(&paths, "safari", 7, "");
+        cmd_edit(
+            &paths,
+            7,
+            Some("via-all".into()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            Scope::All,
+        )
+        .unwrap();
+        assert_eq!(read_store(&paths).unwrap().sources["safari"][0].title, "via-all");
+        let _ = fs::remove_dir_all(&paths.dir);
     }
 
     #[test]

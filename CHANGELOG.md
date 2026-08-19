@@ -11,6 +11,14 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.21.0] - 2026-08-19
+
+### Changed
+
+- 作用域选项合二为一：`--all` 移除，不带 `--source` 即作用于全部 source（列表 / 搜索 / 按 ID 编辑·删除·打开都不再需要额外参数）；只想操作单个 source 时仍用 `--source <NAME>`
+- `apply <URL>` 新增书签不带 `--source` 时仍存入 `default`（需唯一落点，行为不变）
+- 文件夹改名 `mv` 的默认范围随之扩大到全部 source（原为仅 `default`）；输出改为列出受影响的 source 与条数，如 `Moved 2 bookmark(s): Shared → Tech [default(1), safari(1)]`
+
 ## [0.20.0] - 2026-08-19
 
 ### Changed

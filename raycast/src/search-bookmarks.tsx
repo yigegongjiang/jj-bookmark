@@ -66,7 +66,7 @@ export default function Command() {
   // detail 面板默认开：直接对上「尽可能一并展示细节」；⌘Y 切回紧凑列表（此时 accessories 才显示）。
   const [showDetail, setShowDetail] = useState(true);
   // load-once：与 App/Web 前端一致，CLI 只负责 load，过滤在内存（对 CJK 最可预测）。
-  const { data, isLoading, error, revalidate } = useExec(BIN, ["--all", "ls", "--json", "--sort", "visited"], {
+  const { data, isLoading, error, revalidate } = useExec(BIN, ["ls", "--json", "--sort", "visited"], {
     keepPreviousData: true,
   });
 
@@ -93,8 +93,8 @@ export default function Command() {
 
   async function open(b: Bookmark) {
     try {
-      // 走 CLI open：默认浏览器打开 + 记录 last_visited（单一核心，data-side 写操作）。id 全局唯一，用 --all 命中任意 source。
-      await pexec(BIN, ["--all", "open", String(b.id)]);
+      // 走 CLI open：默认浏览器打开 + 记录 last_visited（单一核心，data-side 写操作）。id 全局唯一，无 --source 即跨全部 source 命中。
+      await pexec(BIN, ["open", String(b.id)]);
       await showHUD(`Opened: ${b.title || b.url}`);
     } catch (e) {
       await showToast({ style: Toast.Style.Failure, title: "Open failed", message: String(e) });

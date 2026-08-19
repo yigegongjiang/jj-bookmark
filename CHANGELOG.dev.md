@@ -7,6 +7,17 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.21.0] - 2026-08-19
+
+- 作用域选项合二为一：`--all` 移除，不带 `--source` 即作用于全部 source（列表 / 搜索 / 按 ID 编辑·删除·打开都不再需要额外参数）；只想操作单个 source 时仍用 `--source <NAME>`
+  - `ScopeArgs` 去 `all: bool` 与 `conflicts_with`，`resolve()` = `source.map_or(Scope::All, Scope::Source)`；`--all` 现报 unexpected argument
+  - 调用侧同步去 `--all`：App `CLIRunner` 的 `loadAll` / `edit` / `remove` / `open`，Raycast `ls --json --sort visited` + `open`（`add` / `moveFolder` 仍显式传 `--source`）
+  - 按 ID 全局查找安全性依据：`unique_id` 经 `Store::contains_id` 跨全部 source 排重（实机 1302 条 id 全唯一）
+- `apply <URL>` 新增书签不带 `--source` 时仍存入 `default`（需唯一落点，行为不变）
+  - `cmd_add` 把 `Scope::All` 收敛为 `DEFAULT_SOURCE`，替换原 `--all cannot be used when adding` 报错
+- 文件夹改名 `mv` 的默认范围随之扩大到全部 source（原为仅 `default`）；输出改为列出受影响的 source 与条数
+  - `cmd_mv` 返回 `(moved, Vec<String>)`，逐 source 累积 `name(count)` —— 默认全局后影响面必须自证，避免静默跨 source 改名
+
 ## [0.20.0] - 2026-08-19
 
 - 列表与搜索合并为一个命令：`ls [KEYWORD]`，不带关键词即全量列表；原 `query` 命令移除，`query <KEYWORD>` 改用 `ls <KEYWORD>`

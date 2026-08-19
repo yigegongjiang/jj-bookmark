@@ -1,7 +1,6 @@
 //! jj-bookmark CLI — 唯一核心。读写协议 / 查询只在此实现一遍，
 //! App 经内嵌调用复用。命令见 roadmap.md，数据契约见 data-model.md。
 
-mod filter;
 mod model;
 mod output;
 mod pusher;
@@ -23,7 +22,7 @@ use store::{Paths, mutate, read_store};
     version,
     about = "Bookmark tool",
     disable_help_subcommand = true,
-    before_help = "TL;DR — save a bookmark:\n  1. Search: jj-bookmark --all query <DOMAIN>; same domain = strong match; ask: add or edit <ID>?\n  2. Pick the closest path from jj-bookmark folders; levels are joined by `::` with no spaces (e.g. AI::claude-code); infer title and useful metadata.\n  3. jj-bookmark apply <URL> --title <TITLE> --folder <PATH> [--note <NOTE>] [--excerpt <TEXT>]\n     <URL> = the exact current page URL, verbatim (full path + query); NEVER substitute the bare domain or a trimmed form.\n  Edit: jj-bookmark --all apply <ID> <fields>; delete: jj-bookmark --all apply <ID> --delete."
+    before_help = "TL;DR — save a bookmark:\n  1. Search: jj-bookmark --all ls <DOMAIN>; same domain = strong match; ask: add or edit <ID>?\n  2. Pick the closest path from jj-bookmark folders; levels are joined by `::` with no spaces (e.g. AI::claude-code); infer title and useful metadata.\n  3. jj-bookmark apply <URL> --title <TITLE> --folder <PATH> [--note <NOTE>] [--excerpt <TEXT>]\n     <URL> = the exact current page URL, verbatim (full path + query); NEVER substitute the bare domain or a trimmed form.\n  Edit: jj-bookmark --all apply <ID> <fields>; delete: jj-bookmark --all apply <ID> --delete."
 )]
 struct Cli {
     #[command(flatten)]
@@ -111,8 +110,10 @@ enum Command {
         #[arg(long)]
         delete: bool,
     },
-    /// List bookmarks (sortable)
+    /// List bookmarks, or search by whitespace-separated keywords (sortable)
     Ls {
+        /// Keyword(s) to match title/url/excerpt/note/folder; omit to list all
+        keyword: Option<String>,
         #[arg(long)]
         folder: Option<String>,
         #[arg(long, value_enum, default_value_t = SortKey::Created)]
@@ -127,22 +128,6 @@ enum Command {
     Folders,
     /// List all sources and bookmark counts
     Sources,
-    /// Search bookmarks by whitespace-separated keywords (sortable); `--filter` takes a native jq filter (run by embedded jaq)
-    Query {
-        /// Keyword (may be an empty string to match all, used with --filter)
-        keyword: String,
-        /// Native jq filter; input is {version, bookmarks}, output must be bookmark objects (e.g. `.bookmarks[] | select(.favorite)`)
-        #[arg(long)]
-        filter: Option<String>,
-        #[arg(long)]
-        folder: Option<String>,
-        #[arg(long, value_enum, default_value_t = SortKey::Created)]
-        sort: SortKey,
-        #[arg(long, value_enum)]
-        order: Option<Order>,
-        #[arg(long)]
-        json: bool,
-    },
     /// Open the URL in the default browser and record the last visit
     Open { id: i64 },
     /// Rename / move a folder subtree (prefix-replace all matches, single atomic write)
@@ -200,11 +185,12 @@ fn main() -> Result<()> {
             }
         }
         Command::Ls {
+            keyword,
             folder,
             sort,
             order,
             json,
-        } => cmd_list(&paths, None, None, folder, sort, order, json, scope),
+        } => cmd_list(&paths, keyword, folder, sort, order, json, scope),
         Command::Folders => cmd_folders(&paths, scope),
         Command::Sources => {
             if explicit_scope {
@@ -212,23 +198,6 @@ fn main() -> Result<()> {
             }
             cmd_sources(&paths)
         }
-        Command::Query {
-            keyword,
-            filter,
-            folder,
-            sort,
-            order,
-            json,
-        } => cmd_list(
-            &paths,
-            Some(keyword),
-            filter,
-            folder,
-            sort,
-            order,
-            json,
-            scope,
-        ),
         Command::Open { id } => cmd_open(&paths, id, scope),
         Command::Mv { old, new } => cmd_mv(&paths, old, new, scope),
         Command::Push => {
@@ -303,7 +272,6 @@ fn cmd_sources(paths: &Paths) -> Result<()> {
 fn cmd_list(
     paths: &Paths,
     keyword: Option<String>,
-    jq_filter: Option<String>,
     folder: Option<String>,
     sort: SortKey,
     order: Option<Order>,
@@ -325,9 +293,6 @@ fn cmd_list(
         if let Some(folder) = &folder {
             filtered = query::folder_filter(filtered, folder);
         }
-        if let Some(filter) = &jq_filter {
-            filtered = apply_jq_filter(&filtered, CURRENT_VERSION, filter)?;
-        }
         query::sort_bookmarks(&mut filtered, sort, order);
         *bookmarks = filtered;
     }
@@ -338,31 +303,6 @@ fn cmd_list(
         output::print_human(&sources, matches!(scope, Scope::All));
     }
     Ok(())
-}
-
-/// 用内嵌 jq 引擎（jaq）过滤书签。输入 `{version, bookmarks}`（使 `.bookmarks[] | select(...)`
-/// 等 §9 惯用过滤器可原样工作），输出须为书签对象；数组输出扁平化一层。
-fn apply_jq_filter(bms: &[Bookmark], version: u32, jq: &str) -> Result<Vec<Bookmark>> {
-    let input = serde_json::json!({ "version": version, "bookmarks": bms }).to_string();
-    let outputs = filter::run_filter(&input, jq)?;
-    let mut result = Vec::new();
-    for v in outputs {
-        // 兼容 `.bookmarks[] | ...`（对象流）与 `.bookmarks | map(...)` / `[...]`（数组）
-        let items = match v {
-            serde_json::Value::Array(arr) => arr,
-            other => vec![other],
-        };
-        for item in items {
-            let b: Bookmark = serde_json::from_value(item).map_err(|e| {
-                anyhow!(
-                    "--filter output is not a bookmark object ({e}). query only returns bookmarks; \
-                     for arbitrary jq output, run jq directly against the data file."
-                )
-            })?;
-            result.push(b);
-        }
-    }
-    Ok(result)
 }
 
 fn cmd_open(paths: &Paths, id: i64, scope: Scope) -> Result<()> {
@@ -652,6 +592,15 @@ mod tests {
     #[test]
     fn help_subcommand_is_disabled() {
         assert!(Cli::command().find_subcommand("help").is_none());
+    }
+
+    #[test]
+    fn ls_takes_optional_keyword_and_query_is_gone() {
+        let cli = Cli::try_parse_from(["jj-bookmark", "ls"]).unwrap();
+        assert!(matches!(cli.cmd, Command::Ls { keyword: None, .. }));
+        let cli = Cli::try_parse_from(["jj-bookmark", "ls", "rust lang"]).unwrap();
+        assert!(matches!(cli.cmd, Command::Ls { keyword: Some(k), .. } if k == "rust lang"));
+        assert!(Cli::command().find_subcommand("query").is_none());
     }
 
     #[test]

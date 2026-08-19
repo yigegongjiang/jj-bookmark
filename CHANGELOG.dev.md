@@ -7,6 +7,14 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.20.0] - 2026-08-19
+
+- 列表与搜索合并为一个命令：`ls [KEYWORD]`，不带关键词即全量列表；原 `query` 命令移除，`query <KEYWORD>` 改用 `ls <KEYWORD>`
+  - `Command::Query` 删除，`Command::Ls` 增可选位置参数 `keyword: Option<String>`（沿用 `keyword_filter` 内部分词，语义不变）；`cmd_list` 去 `jq_filter` 参数
+  - `before_help` TL;DR 第 1 步改 `--all ls <DOMAIN>`；App `--all ls --json` / Raycast `--all ls --json --sort visited` 调用不变
+- 移除内置 jq 过滤（原 `query --filter`）：数据文件是纯 JSON，直接用系统 `jq` 处理，能力更完整
+  - 删 `src/filter.rs` + `apply_jq_filter`，Cargo 去 `jaq-core` / `jaq-std` / `jaq-json` —— 无程序化消费者（App / Raycast / web 均不用），且原实现强制输出反序列化为 `Bookmark`，弱于外部 `jq`
+
 ## [0.19.0] - 2026-08-19
 
 - 移除网页元数据抓取：保存书签不再自动联网取标题 / 摘要 / 封面；App 新增时留空标题将保留网址原样，标题与摘要请在新增或编辑时自行填写

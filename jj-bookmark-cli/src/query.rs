@@ -1,5 +1,4 @@
-//! 排序与关键词过滤（data-model §10）。四个固定排序键与关键词模糊搜均为原生比较，
-//! 不经 jq 引擎（jaq 仅服务 `--filter`，见 filter.rs）。
+//! 排序与关键词过滤（data-model §10）。四个固定排序键与关键词模糊搜均为原生比较。
 
 use crate::model::{Bookmark, FOLDER_SEP};
 use clap::ValueEnum;

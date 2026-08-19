@@ -1,6 +1,6 @@
 [package]
 name = "jj-bookmark-cli"
-version = "0.19.0"
+version = "0.20.0"
 edition = "2024"
 
 # 二进制名固定为 jj-bookmark（crate 目录名带 -cli 后缀以区分工程）。
@@ -14,11 +14,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 libc = "0.2"
 anyhow = "1"
-# 内嵌 jq 引擎（纯 Rust，in-process；驱动 query --filter）。三包版本号不统一（jaq-json 2.x
-# 依赖 jaq-core 3.x / jaq-std 3.x），Cargo.lock 锁定精确版本。
-jaq-core = "3.1"
-jaq-std = "3.0"
-jaq-json = "2.0"
 [profile.release]
 lto = true
 strip = true

@@ -11,6 +11,16 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.20.0] - 2026-08-19
+
+### Changed
+
+- 列表与搜索合并为一个命令：`ls [KEYWORD]`，不带关键词即全量列表；原 `query` 命令移除，`query <KEYWORD>` 改用 `ls <KEYWORD>`
+
+### Removed
+
+- 移除内置 jq 过滤（原 `query --filter`）：数据文件是纯 JSON，直接用系统 `jq` 处理，能力更完整
+
 ## [0.19.0] - 2026-08-19
 
 ### Removed

@@ -14,7 +14,7 @@
 
 - CLI：`jj-bookmark-cli/` 构建出二进制 `jj-bookmark`；`apply <URL|ID>` 统一保存 / 编辑，`apply <ID> --delete` 删除（软删除，`--restore` 撤销），`ls [KEYWORD]` 统一列表 / 搜索（`--deleted` 看已删），`sync` 与云端双向同步；全局选项只有 `--source <NAME>`（子命令前后均可写），每条命令恒作用于单一 source，省略即 `default`（= `apply <URL>` 的落点）；其他命令见 `jj-bookmark --help`（仅英文）。
 - App：`jj-bookmark-app/` 由 `package.sh` 组装出 macOS `.app`，桌面端全量浏览 / 编辑，记住窗口、左侧栏尺寸及展开 / 选中路径；bundle 内嵌同版本 CLI 作运行核心，`~/.local/bin/jj-bookmark` 可选安装为指向它的符号链接。偏好设置（⌘,）含闲置自动退出（默认 1 分钟，可选 1 / 5 / 10 / 自定义）、CLI 安装·重装、检查更新。界面随系统语言切换（中 / 日 / 英，非中日语系默认英文）。
-- Web：`jj-bookmark-web/` = Cloudflare Worker + R2，两张页：书签页（folder 树 / 搜索 / 排序 + 内联增删改，与本地经 `jj-bookmark sync` 双向收敛）+ 个人导航页 `123.yigegongjiang.com`（卡片面板：搜索 / 分组筛选 / 高频·最近·手动排序 / 拖拽 / 内联增删改，R2 为唯一数据源）；均 Google 登录访问。详见 [jj-bookmark-web/README.md](./jj-bookmark-web/README.md)。
+- Web：`jj-bookmark-web/` = Cloudflare Worker + R2，**同一份数据两张页**：`/` 全库列表（folder 树 / 搜索 / 排序）+ `/123?f=<folder>` folder 卡片视图（缺省 folder `123`，亦即个人导航页 `123.yigegongjiang.com`）；两页均可内联增删改，与本地经 `jj-bookmark sync` 双向收敛，互相有跳转入口（列表页每个 folder 的 `↗`）。均 Google 登录访问。详见 [jj-bookmark-web/README.md](./jj-bookmark-web/README.md)。
 - 数据文件：`~/.config/jj-bookmark/bookmarks.json`（pretty JSON；顶层 `sources` 分组，条目不重复保存 source；可手改 / `jq` 处理）。同步凭据 `~/.config/jj-bookmark/credentials.json`（Access service token，`0600`，人类一次性写入）。
 
 ## 架构
@@ -22,7 +22,7 @@
 - **CLI = 写侧唯一核心**：读写协议（锁 / 原子写 / 校验）/ 关键词搜索 / 排序，只在 Rust CLI 实现一遍；每条命令作用于单一 source（`--source`，默认 `default`）。
 - **App = CLI 的 GUI 前端**：`.app` 内嵌同版本 `jj-bookmark`（`Contents/Helpers/`），写操作经 `Process` 调用它（每次显式带该书签的 source）；全量读直接解析共享 JSON 文件（原子 rename 保证读到完整版本），即时搜索 / 排序 / folder 树 / FSEvents 监听为 App 原生逻辑。
 - **两个集成面**：共享 JSON 文件格式（App / Raycast / Web 的读来源）+ CLI `--json` 输出（同构形状，供 `jq` / 脚本）。无 FFI / 无共享库 / 无后台常驻。
-- **Web = 可写副本 + 独立导航页**：本地文件仍是主数据源，R2 上是可写副本；两端都能增删改，`jj-bookmark sync`（GET → 按 `id` 记录级 LWW 合并 → `If-Match` 条件写，409 重来）收敛。删除走 `deleted` 墓碑——没有它，「一端删、另一端没删」会让已删条目复活。墓碑对界面不可见，但 CLI / App / raycast / web 各自直接读文件，故四端各自过滤一次。协议与合并规则见 data-model §12。导航页与书签数据无关：R2 `nav.json`（v2 扁平 links + 分组顺序）为唯一数据源，页面内 CRUD；点击次数只存浏览器 localStorage。
+- **Web = 可写副本 + 独立导航页**：本地文件仍是主数据源，R2 上是可写副本；两端都能增删改，`jj-bookmark sync`（GET → 按 `id` 记录级 LWW 合并 → `If-Match` 条件写，409 重来）收敛。删除走 `deleted` 墓碑——没有它，「一端删、另一端没删」会让已删条目复活。墓碑对界面不可见，但 CLI / App / raycast / web 各自直接读文件，故四端各自过滤一次。协议与合并规则见 data-model §12。卡片视图页只是同一份数据按 folder 前缀过滤后的另一种渲染，无独立存储。
 - 技术：CLI = Rust（`clap` + `serde_json`；无 jq 引擎，数据文件直接用外部 `jq` 处理；HTTP 经系统 `curl`，不引入 TLS 依赖链、universal 交叉编译零风险，凭据走 `--config -` 不进 `ps`）；App = Swift + AppKit 纯源码（无 SwiftUI / Storyboard / xib，SwiftPM executable + 模板 `Info.plist`）。
 - 读写安全：原子写（tmp + fsync + rename）+ 独立 lock 文件 `flock` + `.bak` + 容错读；App 侧 FSEvents 监听目录刷新（协议见 data-model §6）。
 
@@ -32,5 +32,5 @@
 - `scripts/` — 构建脚本（`set-version.sh`）
 - `jj-bookmark-cli/` — Rust CLI（cargo），产物二进制 `jj-bookmark`（唯一核心）
 - `jj-bookmark-app/` — macOS App（Swift + AppKit，SwiftPM）+ `package.sh`（组装 `.app`、内嵌 CLI）
-- `jj-bookmark-web/` — Cloudflare Worker（JS）+ 静态可写书签页 + R2 绑定；`sync` 目标 + web 部署（GHA）
+- `jj-bookmark-web/` — Cloudflare Worker（JS）+ 两张静态可写页面（列表 / 卡片）+ R2 绑定；`sync` 目标 + web 部署（GHA）
 - `raycast/` — Raycast extension（TS，dev-only，NEVER 上架）：query + open，经 CLI `ls --json` / `open`；详见 [raycast/README.md](./raycast/README.md)

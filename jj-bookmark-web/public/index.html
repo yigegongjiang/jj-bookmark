@@ -70,7 +70,7 @@
         outline: none;
       }
       header input[type="search"]:focus { border-color: var(--sel); }
-      header select, header button {
+      header select, header button, header a#nav {
         font: inherit;
         color: var(--fg);
         background: var(--bg);
@@ -79,6 +79,7 @@
         padding: 5px 8px;
         cursor: pointer;
       }
+      header a#nav { text-decoration: none; }
       header .count { margin-left: auto; color: var(--fg-2); font-size: 12px; white-space: nowrap; }
       main { flex: 1 1 auto; display: flex; min-height: 0; }
       #sidebar {
@@ -101,6 +102,17 @@
       .fname { overflow: hidden; text-overflow: ellipsis; }
       .fnode.source .fname { font-weight: 600; }
       .fcount { margin-left: 6px; color: var(--fg-2); font-size: 11px; }
+      /* folder → 卡片视图入口：hover 才出现，不与计数争位置 */
+      .fjump {
+        margin-left: 6px;
+        color: var(--fg-2);
+        font-size: 11px;
+        text-decoration: none;
+        visibility: hidden;
+      }
+      .fnode:hover .fjump { visibility: visible; }
+      .fjump:hover { color: var(--sel); }
+      .fnode.sel .fjump { color: var(--sel-fg); }
 
       /* 书签行 */
       .row {
@@ -219,6 +231,7 @@
       </select>
       <button id="order" title="Toggle sort order">↓ Descending</button>
       <button id="add" title="Add a bookmark">+ Add</button>
+      <a id="nav" href="/123" title="Open the 123 launcher">123</a>
       <span class="count" id="count"></span>
       <span class="status" id="status"></span>
     </header>
@@ -492,6 +505,18 @@
         c.className = "fcount";
         c.textContent = count;
         el.appendChild(c);
+
+        // 每个具名 folder 都能跳到卡片视图（/123?f=<path>）——「123」只是它的缺省 folder。
+        // source 行与「未分类」没有 folder 路径，跳过。
+        if (item.path) {
+          const jump = document.createElement("a");
+          jump.className = "fjump";
+          jump.href = `/123?f=${encodeURIComponent(item.path)}`;
+          jump.textContent = "↗";
+          jump.title = `Open ${item.path} as cards`;
+          jump.addEventListener("click", (e) => e.stopPropagation()); // 行本身的 click 是「选中」
+          el.appendChild(jump);
+        }
 
         el.addEventListener("click", () => {
           selectedSource = item.source;

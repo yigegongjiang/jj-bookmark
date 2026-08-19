@@ -1,5 +1,5 @@
-// Worker 入口：/api/bookmarks 读写 R2 书签数据；/api/nav 读写导航页数据；其余路由交静态资源。
-// 页面两张：/ = 书签页（读写，与 CLI sync 双向收敛）；/123 = 个人导航页（web 即唯一 CRUD 入口）。
+// Worker 入口：/api/bookmarks 读写 R2 书签数据；其余路由交静态资源。
+// 页面两张，同一份数据：/ = 书签页（全库列表）；/123 = 导航页（folder `123` 的卡片视图）。
 // 自定义域 123.yigegongjiang.com 指向同一 Worker，host 命中即渲染导航页（路径无语义）。
 //
 // 认证 = 双层：① Cloudflare Access 在边缘按 Google 登录网关；② 本 Worker 再校验
@@ -13,9 +13,7 @@ const BOOKMARKS_MAX_BYTES = 8 * 1024 * 1024; // 真实数据 ~0.9 MB；留足增
 const MAX_SOURCES = 100;
 const MAX_BOOKMARKS = 50000;
 const MAX_TIMESTAMP = 4102444800000; // 2100-01-01Z，超出即视为脏数据（Date 越界会抛）
-const NAV_KEY = "nav.json"; // 导航页数据（同 bucket；仅经 /api/nav 读写，无本地副本）
 const NAV_HOST = "123.yigegongjiang.com";
-const NAV_MAX_BYTES = 512 * 1024;
 
 export default {
   async fetch(request, env) {
@@ -33,10 +31,6 @@ export default {
     if (url.pathname === "/api/bookmarks") {
       return handleBookmarks(request, env);
     }
-    if (url.pathname === "/api/nav") {
-      return handleNav(request, env);
-    }
-
     // 导航域：任意非 API 路径都渲染导航页
     if (url.hostname === NAV_HOST) {
       url.pathname = "/123";
@@ -180,78 +174,6 @@ function clampTimestamp(value) {
 /// 不信任客户端传来的 *_jst——否则 web 写入可能留下与数字主字段矛盾的可读串。
 function jst(ms) {
   return new Date(ms + 9 * 3600 * 1000).toISOString().slice(0, 19).replace("T", " ") + "+09:00";
-}
-
-// ---- 导航页数据（R2 nav.json，页面即唯一数据源） ----
-
-/// GET → { etag, data }（对象缺失 = 空库 + etag:null）；
-/// PUT → 服务端字段白名单重建后整份覆写；If-Match 走 R2 条件写（onlyIf.etagMatches），
-///        失配 409（防两个 tab 相互覆盖），成功回 { etag } 供客户端接续。
-async function handleNav(request, env) {
-  if (request.method === "GET") {
-    const obj = await env.BOOKMARKS.get(NAV_KEY);
-    if (!obj) {
-      return jsonResponse(JSON.stringify({ etag: null, data: { version: 2, groups: [], links: [] } }));
-    }
-    const data = await obj.text();
-    return jsonResponse(`{"etag":${JSON.stringify(obj.etag)},"data":${data}}`);
-  }
-  if (request.method === "PUT") {
-    const raw = await request.text();
-    if (raw.length > NAV_MAX_BYTES) return textError(413, "payload too large");
-    let doc;
-    try {
-      doc = JSON.parse(raw);
-    } catch {
-      return textError(400, "invalid JSON");
-    }
-    const clean = sanitizeNav(doc);
-    if (typeof clean === "string") return textError(400, clean);
-
-    const ifMatch = request.headers.get("If-Match");
-    const res = await env.BOOKMARKS.put(NAV_KEY, JSON.stringify(clean, null, 2), {
-      httpMetadata: { contentType: "application/json" },
-      ...(ifMatch ? { onlyIf: { etagMatches: ifMatch } } : {}),
-    });
-    if (!res) return textError(409, "etag mismatch"); // 条件写失配 → 客户端重载最新数据
-    return jsonResponse(JSON.stringify({ etag: res.etag }));
-  }
-  return textError(405, "method not allowed");
-}
-
-/// 校验并按白名单重建导航数据；合法返回重建后的对象，非法返回错误消息字符串。
-/// v2 结构：links 扁平（顺序 = 手动排序），group 内联在链接上；groups 仅记分组展示顺序。
-/// 只收 v2 —— 页面读到 v1（{groups:[{name,links}]}）时在客户端迁移后再写回。
-function sanitizeNav(doc) {
-  if (!doc || typeof doc !== "object" || Array.isArray(doc)) return "doc must be an object";
-  if (doc.version !== 2) return "unsupported version";
-  if (!Array.isArray(doc.groups) || doc.groups.length > 200) return "invalid groups";
-  if (!Array.isArray(doc.links) || doc.links.length > 1000) return "invalid links";
-  const groups = [];
-  for (const g of doc.groups) {
-    if (typeof g !== "string" || !g || g.length > 100) return "invalid group name";
-    if (!groups.includes(g)) groups.push(g);
-  }
-  const links = [];
-  for (const l of doc.links) {
-    if (!l || typeof l !== "object") return "invalid link";
-    if (typeof l.name !== "string" || l.name.length > 200) return "invalid link name";
-    if (typeof l.url !== "string" || l.url.length > 2048 || !/^https?:\/\//i.test(l.url)) {
-      return "invalid link url";
-    }
-    if (typeof l.group !== "string" || l.group.length > 100) return "invalid link group";
-    if (typeof l.color !== "string" || !/^#[0-9a-f]{6}$/i.test(l.color)) return "invalid link color";
-    if (!Number.isFinite(l.createdAt) || l.createdAt < 0) return "invalid link createdAt";
-    if (l.group && !groups.includes(l.group)) groups.push(l.group);
-    links.push({
-      name: l.name,
-      url: l.url,
-      group: l.group,
-      color: l.color.toLowerCase(),
-      createdAt: Math.floor(l.createdAt),
-    });
-  }
-  return { version: 2, groups: groups.filter((g) => links.some((l) => l.group === g)), links };
 }
 
 function textError(status, msg) {

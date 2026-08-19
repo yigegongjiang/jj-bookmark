@@ -7,6 +7,22 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.26.0] - 2026-08-19
+
+- `/123` 变成任意 folder 的卡片视图：`/123?f=<folder>`，缺省 `123`；列表页侧栏每个 folder hover 出 `↗`
+  - `123.html` 重写数据层：`ROOT` 取自 `?f=`，`STORE`（完整库）+ `links`（派生视图，滤墓碑 + `folder === ROOT || startsWith(ROOT+"::")`），分组 = folder 相对 ROOT 的剩余路径
+  - 写协议与 `index.html` 对齐：整份 PUT + `If-Match`，成功后重新 `load()`；409 提示在 `load()` 之后设，否则被 `setStatus("")` 抹掉
+  - `folderOf("")` 视 root 形态而定：root 下已有子分组 → `<root>::未分组`，否则 `<root>` —— 一律加子层会让原本挂在 root 上的条目集体违反叶子约束（data-model §5）
+  - 新链接 `targetSource()` 跟随该 folder 既有条目的 source，folder 不被拆到两个 source
+  - 分组重命名 = 该组每条记录 `folder` 前缀替换 + 抬 `updated`（等价 CLI `mv`）
+  - `index.html` `folderRow()` 追加 `.fjump`（`stopPropagation`，行 click 仍是选中）；`#nav` / `#home` 互跳，`#home` 在 `123.yigegongjiang.com` 下跳回主域（该 host 任意路径都渲染卡片页）
+- 导航页不再有自己的存储：原 14 条链接并入 `default` source 的 `123::<原分组>`
+  - Worker 删 `handleNav` / `sanitizeNav` / `NAV_KEY` / `NAV_MAX_BYTES`（`NAV_HOST` 路由保留）；R2 `nav.json` 删除
+  - 迁移映射：`name`→`title`、`group`→`folder` 段、`createdAt`→`created`（为 0 的一条用迁移时刻，0 会渲染成 1970）；`color` / 点击次数丢弃
+  - 同批处理本机真实数据：v3→v4、补 16 条墓碑（7/22 快照之后被本地硬删除的，不补会在首次 sync 复活）
+- 卡片配色改由域名散列生成
+  - 删掉 `.sws` / `.sw` / `.grip` / `.cell.dragging` / `.grid.drop` / `.cnum` 等随功能一起失效的 CSS 规则
+
 ## [0.25.1] - 2026-08-19
 
 - `sync` 缺凭据时的提示补全了最容易漏的一步（还要给 Access 应用加一条 `Service Auth` 策略），并给出可直接粘贴的建文件命令

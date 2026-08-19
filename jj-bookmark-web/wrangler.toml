@@ -1,4 +1,4 @@
-# Cloudflare Worker：书签页 / + /api/bookmarks（读写 R2 bookmarks.json）+ 导航页 /123 + /api/nav（读写 R2 nav.json）。
+# Cloudflare Worker：/api/bookmarks（读写 R2 bookmarks.json）+ 两张页：/ 全库列表、/123 folder 卡片视图。
 # 认证：Cloudflare Access（Google IdP）边缘网关 + Worker 校验 Access JWT（见 README / src/index.js）。
 # Worker 名 = jj-bookmark（与目录名 jj-bookmark-web 不同，对齐 Access 应用所配域名）。
 name = "jj-bookmark"
@@ -21,7 +21,7 @@ directory = "./public"
 binding = "ASSETS"
 run_worker_first = true
 
-# R2 绑定：CLI push 上传的 bookmarks.json 落在此 bucket，Worker 直接读。
+# R2 绑定：与 CLI `sync` 双向同步的 bookmarks.json 落在此 bucket，Worker 读写。
 # bucket 需在 Cloudflare 侧预先创建（见 README），否则 deploy 校验失败。
 [[r2_buckets]]
 binding = "BOOKMARKS"

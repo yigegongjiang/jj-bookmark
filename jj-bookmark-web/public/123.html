@@ -385,27 +385,6 @@
       .in.group {
         flex: 1 1 200px;
       }
-      .sws {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 0 2px;
-      }
-      .sw {
-        width: 22px;
-        height: 22px;
-        padding: 0;
-        border: 0;
-        border-radius: 50%;
-        cursor: pointer;
-        transition: transform 0.12s, box-shadow 0.12s;
-      }
-      .sw:hover {
-        transform: scale(1.12);
-      }
-      .sw.on {
-        box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--fg);
-      }
       .fact {
         display: flex;
         align-items: center;
@@ -443,20 +422,6 @@
         color: var(--faint);
         font-family: var(--mono);
         font-size: 10.5px;
-      }
-      .shead .grip {
-        position: static;
-        width: 20px;
-        height: 20px;
-        background: none;
-        color: var(--faint);
-        opacity: 0;
-      }
-      .shead .grip.ghost {
-        visibility: hidden;
-      }
-      .sec:hover .shead .grip {
-        opacity: 1;
       }
       .iconbtn {
         display: grid;
@@ -572,10 +537,6 @@
         font-size: 10.5px;
         font-weight: 600;
       }
-      .cnum {
-        color: var(--faint);
-        font-size: 10.5px;
-      }
       .ops {
         position: absolute;
         top: 10px;
@@ -608,45 +569,6 @@
       }
       .op.del:hover {
         color: var(--danger);
-      }
-      .grip {
-        position: absolute;
-        top: 12px;
-        left: 12px;
-        z-index: 2;
-        display: grid;
-        place-items: center;
-        width: 30px;
-        height: 30px;
-        border-radius: 8px;
-        color: #0a0b0f;
-        background: rgba(0, 0, 0, 0.14);
-        cursor: grab;
-        opacity: 0;
-        transition: opacity 0.12s;
-      }
-      .cell:hover .grip {
-        opacity: 1;
-      }
-      .grip:active {
-        cursor: grabbing;
-      }
-      .cell.dragging {
-        opacity: 0.4;
-      }
-      .cell.drop .card,
-      .grid.drop {
-        border-color: var(--accent);
-      }
-      .grid.drop {
-        border: 1px dashed var(--accent);
-        border-radius: var(--r);
-        margin: -4px;
-        padding: 4px;
-      }
-      .sec.drop .shead {
-        border-bottom-color: var(--accent);
-        box-shadow: 0 -2px 0 0 var(--accent);
       }
       .flash .card {
         animation: flash 1.6s ease-out;
@@ -724,9 +646,6 @@
           opacity: 0.72;
         }
         .iconbtn,
-        .grip {
-          opacity: 0.72;
-        }
       }
     </style>
   </head>
@@ -734,20 +653,20 @@
     <div class="page">
       <div class="wrap">
         <header class="top">
-          <div class="logo">123</div>
+          <div class="logo" id="logo">123</div>
           <div class="titles">
             <div class="trow">
-              <h1>123</h1>
+              <h1 id="title">123</h1>
               <span class="pill" id="count">—</span>
             </div>
-            <p class="sub">个人导航 · 页面内直接维护，改动自动落库</p>
+            <p class="sub" id="sub">书签库文件夹的卡片视图 · 改动即时落库</p>
           </div>
           <span id="status"></span>
         </header>
 
         <section class="panel">
           <div class="phead">
-            <span class="ptitle">Bookmarks</span>
+            <span class="ptitle">链接</span>
             <div class="tools">
               <div class="search">
                 <span class="ic" id="qic"></span>
@@ -755,6 +674,7 @@
                 <button id="qx" type="button" title="清空"></button>
               </div>
               <div class="seg" id="sort" role="group" aria-label="排序方式"></div>
+              <a class="btn" id="home" href="/">全部书签</a>
               <button class="btn primary" id="add" type="button">添加</button>
             </div>
           </div>
@@ -770,10 +690,25 @@
     </div>
 
     <script>
-      "use strict";
+      // 本页 = 书签库任意 folder 的卡片视图：数据源就是 /api/bookmarks，筛出 folder 为
+      // <root> 或 <root>::* 的未删除条目，按下一级路径分组渲染。没有独立存储 —— nav.json 已退役。
+      // root 由 `?f=<folder>` 指定（书签页每个 folder 节点都挂了这个链接），缺省即 `123`。
+      //
+      // 与书签页共用同一套写协议：整份 PUT + `If-Match` 条件写，409 提示并重载。
+      // 因此这里必须持有**完整的 STORE**（含其他 folder 与墓碑），只渲染其中的子集；
+      // 写回时丢掉任何一部分，都等于替另一端做了删除。
       const $ = (id) => document.getElementById(id);
-      const API = "/api/nav";
-      const LS_CLICKS = "jj-nav-clicks";
+      const API = "/api/bookmarks";
+      // 导航域下任意路径都渲染本页（Worker 的 host 路由），故「全部书签」必须跳回主域；
+      // 主域下用相对路径，本地桩调试才走得通。
+      const NAV_HOST = "123.yigegongjiang.com";
+      const SCHEMA_VERSION = 4; // 与 CLI CURRENT_VERSION / Worker BOOKMARKS_VERSION 对齐
+      const DEFAULT_SOURCE = "default";
+      const SEP = "::"; // folder 层级分隔符，与 CLI FOLDER_SEP 一致（data-model §5）
+      const DEFAULT_ROOT = "123"; // 缺省视图 = 个人导航
+      /// 视图根 folder。`::` 在 query 里合法，无需额外转义规则；空值回落缺省。
+      const ROOT = (new URLSearchParams(location.search).get("f") || "").trim() || DEFAULT_ROOT;
+      const UNGROUPED = "未分组";
       const LS_SORT = "jj-nav-sort";
       const PALETTE = [
         "#7c8bff",
@@ -786,9 +721,9 @@
         "#c084fc",
       ];
       const SORTS = [
-        ["freq", "高频", "按本机点击次数"],
+        ["group", "分组", "按分组分区展示"],
         ["recent", "最近", "按添加时间"],
-        ["manual", "手动", "拖拽排序 / 分组视图"],
+        ["name", "名称", "按名称"],
       ];
       const ICONS = {
         search:
@@ -798,27 +733,20 @@
           '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
         close:
           '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
-        grip: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="9" cy="6" r="1.7"/><circle cx="15" cy="6" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="9" cy="18" r="1.7"/><circle cx="15" cy="18" r="1.7"/></svg>',
       };
 
-      // doc = 唯一数据源（R2 nav.json）：links 为全局顺序，组内相对次序即手动排序；
-      // groups 仅记分组的展示顺序。点击次数是本机偏好，存 localStorage，不入库。
-      let doc = { version: 2, groups: [], links: [] };
-      let etag = null;
-      let clicks = readLocal(LS_CLICKS) || {};
+      let STORE = { version: SCHEMA_VERSION, sources: {} }; // 完整书签库，写回用
+      let etag = null; // 条件写凭据；null = 远端对象尚不存在
+      let links = []; // STORE 的派生视图：{ id, source, name, url, group, createdAt }
       let sortMode = SORTS.some((s) => s[0] === localStorage.getItem(LS_SORT))
         ? localStorage.getItem(LS_SORT)
-        : "freq";
+        : "group";
       let filter = null; // null = 全部；"" = 未分组；其他 = 分组名
       let query = "";
-      let form = null; // { index:number|null, name, url, group, color, err }
+      let form = null; // { id:number|null, name, url, group, err }
       let flashUrl = null;
-      let saveTimer = null; // 非 null = 有变更待保存
       let saving = false;
-      let pendingSave = false;
       let statusTimer = null;
-      let drag = null; // { kind:'link', i } | { kind:'group', g }
-      let hoverEl = null;
 
       // ---------- 工具 ----------
       function el(tag, cls, text) {
@@ -842,49 +770,67 @@
           return "";
         }
       }
-      function validUrl(l) {
-        return !!l && /^https?:\/\//i.test(l.url || "");
-      }
       function hash(s) {
         let h = 0;
         for (const c of s) h = (h * 31 + c.codePointAt(0)) >>> 0;
         return h;
       }
+      /// 卡片配色由域名散列而来：确定、零存储。书签模型没有 color 字段，也不该为配色加一个。
       function autoColor(url) {
         return PALETTE[hash(host(url) || url) % PALETTE.length];
       }
-      function normColor(c) {
-        return /^#[0-9a-f]{6}$/i.test(c || "") ? c.toLowerCase() : "";
+
+      // ---------- folder ⇄ 分组 ----------
+      /// 分组名 = folder 相对 root 的剩余路径（`123::JJ` → `JJ`）；挂在 root 本身 = 未分组。
+      function groupOf(folder) {
+        if (folder === ROOT) return "";
+        const rest = folder.slice(ROOT.length + SEP.length);
+        return rest === UNGROUPED ? "" : rest;
       }
-      function readLocal(k) {
-        try {
-          return JSON.parse(localStorage.getItem(k) || "null");
-        } catch {
-          return null;
-        }
+      /// 未分组的落点取决于 root 当前形态：root 下已经有子文件夹时挂 `<root>::未分组`，
+      /// 否则直接挂 `<root>`。书签只能挂叶子 folder，被占用的路径之间不得互为祖先
+      /// （data-model §5）—— 一律挂 `<root>::未分组` 会让原本直接挂在 root 上的条目全部违规。
+      function folderOf(group) {
+        if (group) return ROOT + SEP + group;
+        return links.some((l) => l.group) ? ROOT + SEP + UNGROUPED : ROOT;
       }
-      function writeLocal(k, v) {
-        try {
-          localStorage.setItem(k, JSON.stringify(v));
-        } catch {
-          /* 隐私模式 / 配额满：点击次数丢失不影响主功能 */
-        }
+      function inScope(folder) {
+        return folder === ROOT || folder.startsWith(ROOT + SEP);
       }
 
-      // ---------- 加载 / 迁移 / 保存 ----------
+      // ---------- 加载 / 保存 ----------
       async function load() {
         try {
           const r = await fetch(API, { cache: "no-store" });
           if (!r.ok) throw new Error(r.status);
-          const j = await r.json();
-          doc = migrate(j.data);
-          etag = j.etag;
-          pruneClicks();
+          etag = r.headers.get("ETag");
+          const data = await r.json();
+          const sources = {};
+          if (data && data.sources && typeof data.sources === "object" && !Array.isArray(data.sources)) {
+            for (const [name, list] of Object.entries(data.sources)) {
+              sources[name.trim() || DEFAULT_SOURCE] = Array.isArray(list) ? list : [];
+            }
+          }
+          STORE = { version: SCHEMA_VERSION, sources };
+          links = [];
+          for (const [source, list] of Object.entries(STORE.sources)) {
+            for (const b of list) {
+              if (b.deleted || !inScope(b.folder || "")) continue;
+              links.push({
+                id: b.id,
+                source,
+                name: b.title || "",
+                url: b.url || "",
+                group: groupOf(b.folder || ""),
+                createdAt: b.created || 0,
+              });
+            }
+          }
           renderAll();
-        } catch {
+        } catch (e) {
           const b = $("body");
           b.textContent = "";
-          const wrap = el("div", "none", "加载失败　");
+          const wrap = el("div", "none", `加载失败（${e.message}）　`);
           const retry = el("button", "btn", "重试");
           retry.type = "button";
           retry.addEventListener("click", load);
@@ -893,87 +839,33 @@
         }
       }
 
-      /// v1 { groups:[{name,links:[{name,url}]}] } → v2 { groups:[name], links:[{…,group,color,createdAt}] }
-      function migrate(d) {
-        const out = { version: 2, groups: [], links: [] };
-        if (!d || typeof d !== "object") return out;
-        if (Array.isArray(d.links)) {
-          out.groups = (Array.isArray(d.groups) ? d.groups : []).filter((g) => typeof g === "string" && g);
-          out.links = d.links.filter(validUrl).map((l) => ({
-            name: String(l.name || ""),
-            url: l.url,
-            group: typeof l.group === "string" ? l.group : "",
-            color: normColor(l.color) || autoColor(l.url),
-            createdAt: Number(l.createdAt) || 0,
-          }));
-        } else if (Array.isArray(d.groups)) {
-          for (const g of d.groups) {
-            if (!g || typeof g !== "object") continue;
-            const name = String(g.name || "");
-            for (const l of Array.isArray(g.links) ? g.links : []) {
-              if (!validUrl(l)) continue;
-              out.links.push({
-                name: String(l.name || ""),
-                url: l.url,
-                group: name,
-                color: autoColor(l.url),
-                createdAt: 0,
-              });
-            }
-          }
-        }
-        for (const l of out.links) if (l.group && !out.groups.includes(l.group)) out.groups.push(l.group);
-        out.groups = out.groups.filter((g) => out.links.some((l) => l.group === g));
-        return out;
-      }
-
-      function serialize() {
-        const links = doc.links.filter(validUrl).map((l) => ({
-          name: l.name || "",
-          url: l.url,
-          group: l.group || "",
-          color: normColor(l.color) || autoColor(l.url),
-          createdAt: Number(l.createdAt) || 0,
-        }));
-        const groups = doc.groups.filter((g) => links.some((l) => l.group === g));
-        for (const l of links) if (l.group && !groups.includes(l.group)) groups.push(l.group);
-        return { version: 2, groups, links };
-      }
-
-      function scheduleSave() {
-        clearTimeout(saveTimer);
-        saveTimer = setTimeout(saveNow, 500);
-      }
-
-      async function saveNow() {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-        if (saving) {
-          pendingSave = true;
-          return;
-        }
+      /// 整份写回 + 条件写。成功后重新 load()：页面状态直接取自服务端，既不本地重算派生字段
+      /// （`*_jst` 由 Worker 生成），也顺带吸收 CLI sync 在此期间的写入。
+      async function save(label) {
+        if (saving) return false;
         saving = true;
-        setStatus("保存中…");
+        setStatus(`${label}…`);
         try {
           const headers = { "content-type": "application/json" };
           if (etag) headers["If-Match"] = etag;
-          const r = await fetch(API, { method: "PUT", headers, body: JSON.stringify(serialize()) });
+          const r = await fetch(API, { method: "PUT", headers, body: JSON.stringify(STORE) });
           if (r.status === 409) {
-            alert("数据已在其他页面更新，将重新加载最新内容");
-            location.reload();
-            return;
+            await load();
+            // 提示必须在 load 之后设：load 成功会清状态，先设会被抹掉，
+            // 用户就会以为存上了，而这次改动其实已被丢弃。
+            setStatus("数据已在别处更新，已重载；本次改动未保存", { err: true });
+            return false;
           }
-          if (!r.ok) throw new Error(r.status);
-          etag = (await r.json()).etag;
+          if (!r.ok) throw new Error(`${r.status} ${(await r.text()).trim()}`);
+          await load();
           setStatus("已保存", { fade: true });
-        } catch {
-          setStatus("保存失败，点击重试", { err: true });
+          return true;
+        } catch (e) {
+          await load();
+          setStatus(`保存失败（${e.message}），未保存`, { err: true });
+          return false;
         } finally {
           saving = false;
-          if (pendingSave) {
-            pendingSave = false;
-            saveNow();
-          }
         }
       }
 
@@ -984,83 +876,78 @@
         s.className = opts.err ? "err" : "";
         if (opts.fade) statusTimer = setTimeout(() => (s.textContent = ""), 2000);
       }
-      $("status").addEventListener("click", () => {
-        if ($("status").className === "err") saveNow();
-      });
-      window.addEventListener("beforeunload", (e) => {
-        if (saveTimer !== null || saving) {
-          e.preventDefault();
-          e.returnValue = "";
-        }
-      });
 
-      // ---------- 点击次数（本机） ----------
-      function bump(url) {
-        clicks[url] = (clicks[url] || 0) + 1;
-        writeLocal(LS_CLICKS, clicks);
-      }
-      function pruneClicks() {
-        const live = new Set(doc.links.map((l) => l.url));
-        let changed = false;
-        for (const k of Object.keys(clicks)) {
-          if (!live.has(k)) {
-            delete clicks[k];
-            changed = true;
-          }
+      // ---------- STORE 变更（都在 save() 之前就地改） ----------
+      function findRecord(id) {
+        for (const [source, list] of Object.entries(STORE.sources)) {
+          const index = list.findIndex((b) => b.id === id);
+          if (index >= 0) return { source, list, index, record: list[index] };
         }
-        if (changed) writeLocal(LS_CLICKS, clicks);
+        return null;
+      }
+      /// 新链接跟随本 folder 既有条目的 source，folder 才不会被拆到两个 source 里；
+      /// 空 folder（第一条）落 default，与 CLI `apply <URL>` 的落点一致。
+      function targetSource() {
+        return links.length ? links[0].source : DEFAULT_SOURCE;
       }
 
-      // ---------- 视图数据 ----------
+      /// 与 CLI data-model §7 一致：id = 当前 Unix 毫秒，冲突 +1。墓碑也占 id，不可复用。
+      function freshId() {
+        const used = new Set(Object.values(STORE.sources).flat().map((b) => b.id));
+        let id = Date.now();
+        while (used.has(id)) id++;
+        return id;
+      }
+
+      // ---------- 视图派生 ----------
       function groupCounts() {
         const m = new Map();
-        for (const l of doc.links) {
-          if (!validUrl(l)) continue;
-          const g = l.group || "";
-          m.set(g, (m.get(g) || 0) + 1);
-        }
+        for (const l of links) m.set(l.group, (m.get(l.group) || 0) + 1);
         return m;
       }
+      /// 分组顺序 = 名称升序（书签模型不存展示顺序），未分组恒在末尾。
       function orderedGroups() {
         const c = groupCounts();
-        const gs = doc.groups.filter((g) => c.get(g));
+        const gs = [...c.keys()].filter(Boolean).sort((a, b) => a.localeCompare(b));
         if (c.get("")) gs.push("");
         return gs;
       }
-      function ensureGroup(g) {
-        if (g && !doc.groups.includes(g)) doc.groups.push(g);
-      }
       function matches(l, q) {
         return (
-          (l.name || "").toLowerCase().includes(q) ||
+          l.name.toLowerCase().includes(q) ||
           l.url.toLowerCase().includes(q) ||
-          (l.group || "").toLowerCase().includes(q)
+          l.group.toLowerCase().includes(q)
         );
       }
-      /// 返回 [{ l, i }]（i = doc.links 全局下标），已按当前 filter / query / sort 处理
       function visible() {
-        let out = doc.links.map((l, i) => ({ l, i })).filter((x) => validUrl(x.l));
-        if (filter !== null) out = out.filter((x) => (x.l.group || "") === filter);
+        let out = links.slice();
+        if (filter !== null) out = out.filter((l) => l.group === filter);
         if (query) {
           const q = query.toLowerCase();
-          out = out.filter((x) => matches(x.l, q));
+          out = out.filter((l) => matches(l, q));
         }
-        if (sortMode === "freq") {
-          out.sort((a, b) => (clicks[b.l.url] || 0) - (clicks[a.l.url] || 0) || a.i - b.i);
-        } else if (sortMode === "recent") {
-          out.sort((a, b) => (b.l.createdAt || 0) - (a.l.createdAt || 0) || a.i - b.i);
-        }
+        const byName = (a, b) => (a.name || a.url).localeCompare(b.name || b.url);
+        if (sortMode === "recent") out.sort((a, b) => b.createdAt - a.createdAt || byName(a, b));
+        else out.sort(byName);
         return out;
       }
-      const grouped = () => sortMode === "manual" && filter === null && !query;
-      const canDrag = () => sortMode === "manual" && !query;
+      const grouped = () => sortMode === "group" && filter === null && !query;
 
       // ---------- 渲染 ----------
       function renderAll() {
+        renderHeading();
         renderSort();
         renderChips();
         renderSlot();
         renderList();
+      }
+
+      function renderHeading() {
+        const leaf = ROOT.split(SEP).pop();
+        $("title").textContent = leaf;
+        $("logo").textContent = [...leaf][0].toUpperCase();
+        document.title = leaf === DEFAULT_ROOT ? "123" : `${leaf} · 123`;
+        $("sub").textContent = `书签库 ${ROOT} 的卡片视图 · 改动即时落库`;
       }
 
       function renderSort() {
@@ -1085,11 +972,11 @@
         const box = $("chips");
         box.textContent = "";
         const counts = groupCounts();
-        const total = doc.links.filter(validUrl).length;
+        const total = links.length;
         $("count").textContent = total ? `${total} 个链接 · ${orderedGroups().filter(Boolean).length} 组` : "空";
         if (!total) return;
         box.appendChild(chip("全部", total, null));
-        for (const g of orderedGroups()) chip(g || "未分组", counts.get(g), g, box);
+        for (const g of orderedGroups()) chip(g || UNGROUPED, counts.get(g), g, box);
         function chip(label, n, key, parent) {
           const b = el("button", "chip" + (filter === key ? " on" : ""));
           b.type = "button";
@@ -1111,8 +998,8 @@
         body.textContent = "";
         const items = visible();
 
-        if (!doc.links.filter(validUrl).length) {
-          const b = el("button", "empty", "还没有链接 —— 点这里添加第一条");
+        if (!links.length) {
+          const b = el("button", "empty", `${ROOT} 下还没有链接 —— 点这里添加第一条`);
           b.type = "button";
           b.addEventListener("click", () => openForm(null));
           body.appendChild(b);
@@ -1124,10 +1011,12 @@
         }
 
         if (grouped()) {
-          for (const g of orderedGroups()) body.appendChild(section(g, items.filter((x) => (x.l.group || "") === g)));
+          for (const g of orderedGroups()) {
+            body.appendChild(section(g, items.filter((l) => l.group === g)));
+          }
         } else {
           const grid = el("div", "grid");
-          for (const x of items) grid.appendChild(cell(x, x.l.group || ""));
+          for (const l of items) grid.appendChild(cell(l));
           body.appendChild(grid);
         }
         if (flashUrl) {
@@ -1140,14 +1029,7 @@
       function section(g, items) {
         const sec = el("div", "sec");
         const head = el("div", "shead");
-        if (g) {
-          head.appendChild(gripFor(sec, { kind: "group", g }, "拖拽调整分组顺序"));
-        } else {
-          const spacer = el("span", "grip ghost"); // 「未分组」不可排序，占位保持标题对齐
-          spacer.innerHTML = ICONS.grip;
-          head.appendChild(spacer);
-        }
-        const title = el("h2", "", g || "未分组");
+        const title = el("h2", "", g || UNGROUPED);
         head.appendChild(title);
         head.appendChild(el("span", "n", String(items.length)));
         if (g) {
@@ -1156,23 +1038,9 @@
           head.appendChild(ren);
         }
         sec.appendChild(head);
-
         const grid = el("div", "grid");
-        for (const x of items) grid.appendChild(cell(x, g));
-        dropZone(grid, "link", () => moveLink(drag.i, null, g));
+        for (const l of items) grid.appendChild(cell(l));
         sec.appendChild(grid);
-
-        // 分组整体拖拽：落在本 section 上 = 插到本组之前
-        sec.addEventListener("dragover", (e) => {
-          if (drag?.kind !== "group" || drag.g === g || !g) return;
-          e.preventDefault();
-          setHover(sec);
-        });
-        sec.addEventListener("drop", (e) => {
-          if (drag?.kind !== "group" || drag.g === g || !g) return;
-          e.preventDefault();
-          moveGroup(drag.g, g);
-        });
         return sec;
       }
 
@@ -1198,67 +1066,71 @@
         input.addEventListener("blur", () => finish(true));
       }
 
-      function cell(x, group) {
+      /// 重命名分组 = 把该组每条记录的 folder 换掉（等价于 CLI 的 `mv`）。
+      async function renameGroup(from, to) {
+        const now = Date.now();
+        for (const l of links.filter((x) => x.group === from)) {
+          const found = findRecord(l.id);
+          if (!found) continue;
+          found.record.folder = folderOf(to);
+          found.record.updated = now; // LWW 依据
+        }
+        if (filter === from) filter = to;
+        await save("重命名中");
+      }
+
+      function cell(l) {
         const c = el("div", "cell");
-        if (flashUrl && x.l.url === flashUrl) c.classList.add("flash");
+        if (flashUrl && l.url === flashUrl) c.classList.add("flash");
 
         const a = el("a", "card");
-        a.href = x.l.url;
+        a.href = l.url;
         a.target = "_blank";
         a.rel = "noopener noreferrer";
         a.draggable = false;
-        const name = (x.l.name || "").trim() || host(x.l.url) || x.l.url;
-        a.title = `${name}\n${x.l.url}`;
+        const name = l.name.trim() || host(l.url) || l.url;
+        a.title = `${name}\n${l.url}`;
 
         const m = el("span", "mark", [...name][0].toUpperCase());
-        m.style.background = normColor(x.l.color) || autoColor(x.l.url);
+        m.style.background = autoColor(l.url);
         a.appendChild(m);
 
         const b = el("span", "cbody");
         b.appendChild(el("span", "cname", name));
         const meta = el("span", "cmeta");
-        const h = host(x.l.url);
+        const h = host(l.url);
         if (h && h !== name) meta.appendChild(el("span", "chost", h));
-        if (x.l.group && !grouped()) meta.appendChild(el("span", "ctag", "#" + x.l.group));
-        const n = clicks[x.l.url] || 0;
-        if (n) meta.appendChild(el("span", "cnum", `${n} 次`));
+        if (l.group && !grouped()) meta.appendChild(el("span", "ctag", "#" + l.group));
         b.appendChild(meta);
         a.appendChild(b);
-
-        const hit = () => bump(x.l.url);
-        a.addEventListener("click", hit);
-        a.addEventListener("auxclick", (e) => e.button === 1 && hit());
         c.appendChild(a);
-
-        if (canDrag()) c.appendChild(gripFor(c, { kind: "link", i: x.i }, "拖拽排序 / 移动到其他分组"));
 
         const ops = el("div", "ops");
         const edit = iconBtn("op", "pencil", "编辑");
-        edit.addEventListener("click", () => openForm(x.i));
+        edit.addEventListener("click", () => openForm(l.id));
         const del = iconBtn("op del", "close", "删除");
-        del.addEventListener("click", () => {
+        del.addEventListener("click", async () => {
           if (!confirm(`删除「${name}」？`)) return;
-          doc.links.splice(x.i, 1);
-          renderAll();
-          scheduleSave();
+          const found = findRecord(l.id);
+          if (!found) return;
+          // 软删除：置墓碑并抬 updated，绝不从数组里抹掉（data-model §12）
+          found.record.deleted = true;
+          found.record.updated = Date.now();
+          await save("删除中");
         });
         ops.append(edit, del);
         c.appendChild(ops);
-
-        // 链接落在本 cell 上 = 插到它之前
-        dropZone(c, "link", () => moveLink(drag.i, x.i, group));
         return c;
       }
 
       // ---------- 添加 / 编辑表单 ----------
-      function openForm(index) {
-        const l = index === null ? null : doc.links[index];
+      function openForm(id) {
+        const l = id === null ? null : links.find((x) => x.id === id);
         form = {
-          index,
-          name: l ? l.name || "" : "",
+          id: l ? l.id : null,
+          name: l ? l.name : "",
           url: l ? l.url : "",
-          group: l ? l.group || "" : filter || "",
-          color: l ? normColor(l.color) || autoColor(l.url) : "",
+          group: l ? l.group : filter || "",
           err: "",
         };
         renderSlot();
@@ -1274,57 +1146,45 @@
         const slot = $("slot");
         slot.textContent = "";
         if (!form) return;
-
         const f = el("form", "editor");
-        const r1 = el("div", "frow");
-        const name = el("input", "in name");
-        name.placeholder = "名称（留空取域名）";
-        name.value = form.name;
-        name.addEventListener("input", () => (form.name = name.value));
-        const url = el("input", "in url");
-        url.placeholder = "https://…";
-        url.value = form.url;
-        url.addEventListener("input", () => (form.url = url.value));
-        r1.append(name, url);
-
-        const r2 = el("div", "frow");
-        const group = el("input", "in group");
-        group.placeholder = "分组（留空 = 未分组）";
-        group.value = form.group;
-        group.setAttribute("list", "grouplist");
-        group.addEventListener("input", () => (form.group = group.value));
+        const row = el("div", "frow");
+        const mk = (cls, ph, value, key) => {
+          const i = el("input", "in " + cls);
+          i.placeholder = ph;
+          i.value = value;
+          i.autocomplete = "off";
+          i.addEventListener("input", () => (form[key] = i.value));
+          return i;
+        };
+        row.appendChild(mk("url", "https://example.com", form.url, "url"));
+        row.appendChild(mk("name", "名称（留空则用域名）", form.name, "name"));
+        const group = mk("group", "分组（留空 = 未分组）", form.group, "group");
+        group.setAttribute("list", "groups");
+        row.appendChild(group);
         const list = el("datalist");
-        list.id = "grouplist";
-        for (const g of doc.groups) {
+        list.id = "groups";
+        for (const g of orderedGroups().filter(Boolean)) {
           const o = el("option");
           o.value = g;
           list.appendChild(o);
         }
-        const sws = el("div", "sws");
-        for (const c of PALETTE) {
-          const s = el("button", "sw" + (form.color === c ? " on" : ""));
-          s.type = "button";
-          s.style.background = c;
-          s.title = c;
-          s.addEventListener("click", () => {
-            form.color = c;
-            renderSlot();
-          });
-          sws.appendChild(s);
-        }
-        r2.append(group, list, sws);
+        row.appendChild(list);
+        f.appendChild(row);
 
+        if (form.err) f.appendChild(el("div", "ferr", form.err));
+        // 落点提示随分组输入实时更新：整体 renderSlot 会丢焦点，故只改这一行文字
+        const where = (g) => `保存到书签库 ${targetSource()} source 的 ${folderOf(g)} 下`;
+        const hint = el("div", "fhint", where(form.group));
+        group.addEventListener("input", () => (hint.textContent = where(group.value.trim())));
+        f.appendChild(hint);
         const act = el("div", "fact");
-        const ok = el("button", "btn primary", form.index === null ? "添加" : "保存");
-        ok.type = "submit";
         const cancel = el("button", "btn", "取消");
         cancel.type = "button";
         cancel.addEventListener("click", closeForm);
-        act.append(ok, cancel);
-        if (form.err) act.appendChild(el("span", "ferr", form.err));
-        act.appendChild(el("span", "fhint", "未选颜色则按域名自动配色"));
-
-        f.append(r1, r2, act);
+        const ok = el("button", "btn primary", form.id === null ? "添加" : "保存");
+        ok.type = "submit";
+        act.append(cancel, ok);
+        f.appendChild(act);
         f.addEventListener("submit", (e) => {
           e.preventDefault();
           submitForm();
@@ -1332,174 +1192,84 @@
         slot.appendChild(f);
       }
 
-      function submitForm() {
-        let url = (form.url || "").trim();
-        if (url && !/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) url = "https://" + url;
-        if (!/^https?:\/\//i.test(url)) {
-          form.err = "请填写 http(s) 链接";
+      async function submitForm() {
+        const url = form.url.trim();
+        if (!url) {
+          form.err = "URL 不能为空";
           renderSlot();
           return;
         }
-        const name = (form.name || "").trim() || host(url) || url;
-        const group = (form.group || "").trim();
-        const color = normColor(form.color) || autoColor(url);
-        ensureGroup(group);
-        if (form.index === null) {
-          doc.links.push({ name, url, group, color, createdAt: Date.now() });
-          filter = null;
-          query = "";
-          $("q").value = "";
-          $("qx").style.display = "none";
-        } else {
-          Object.assign(doc.links[form.index], { name, url, group, color });
-        }
+        const group = form.group.trim();
+        const title = form.name.trim() || url; // 与 CLI 一致：无标题时用 URL 占位
+        const now = Date.now();
+        const editing = form.id;
         flashUrl = url;
-        form = null;
-        renderAll();
-        scheduleSave();
-      }
 
-      // ---------- 拖拽 ----------
-      function gripFor(ghost, info, title) {
-        const g = el("span", "grip");
-        g.innerHTML = ICONS.grip;
-        g.title = title;
-        g.draggable = true;
-        g.addEventListener("dragstart", (e) => {
-          drag = info;
-          ghost.classList.add("dragging");
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("text/plain", "");
-          e.dataTransfer.setDragImage(ghost, 14, 14);
-        });
-        g.addEventListener("dragend", () => {
-          ghost.classList.remove("dragging");
-          drag = null;
-          setHover(null);
-        });
-        return g;
-      }
-
-      function dropZone(node, kind, action) {
-        node.addEventListener("dragover", (e) => {
-          if (drag?.kind !== kind) return;
-          e.preventDefault();
-          e.stopPropagation();
-          setHover(node);
-        });
-        node.addEventListener("drop", (e) => {
-          if (drag?.kind !== kind) return;
-          e.preventDefault();
-          e.stopPropagation();
-          action();
-        });
-      }
-
-      function setHover(node) {
-        if (hoverEl && hoverEl !== node) hoverEl.classList.remove("drop");
-        hoverEl = node;
-        if (node) node.classList.add("drop");
-      }
-
-      /// before = 目标 cell 的全局下标（插到其前）；null = 追加到 group 末尾
-      function moveLink(from, before, group) {
-        setHover(null);
-        const [l] = doc.links.splice(from, 1);
-        l.group = group;
-        ensureGroup(group);
-        let idx;
-        if (before === null) {
-          let last = -1;
-          doc.links.forEach((x, i) => {
-            if ((x.group || "") === group) last = i;
-          });
-          idx = last < 0 ? doc.links.length : last + 1;
+        if (editing === null) {
+          const record = {
+            id: freshId(),
+            title,
+            url,
+            excerpt: "",
+            note: "",
+            folder: folderOf(group),
+            deleted: false,
+            created: now,
+            created_jst: "", // 派生字段由 Worker 依数字主字段重算
+            updated: now,
+            updated_jst: "",
+            last_visited: 0,
+            last_visited_jst: "",
+          };
+          (STORE.sources[targetSource()] ||= []).push(record);
         } else {
-          idx = before > from ? before - 1 : before;
+          const found = findRecord(editing);
+          if (!found) return;
+          Object.assign(found.record, { title, url, folder: folderOf(group) });
+          found.record.updated = now; // LWW 依据
         }
-        doc.links.splice(idx, 0, l);
-        drag = null;
-        renderAll();
-        scheduleSave();
+        form = null;
+        await save(editing === null ? "添加中" : "保存中");
       }
 
-      function moveGroup(from, to) {
-        setHover(null);
-        const gs = doc.groups;
-        const fi = gs.indexOf(from);
-        if (fi < 0) return;
-        gs.splice(fi, 1);
-        const ti = gs.indexOf(to);
-        gs.splice(ti < 0 ? gs.length : ti, 0, from);
-        drag = null;
-        renderList();
-        scheduleSave();
-      }
-
-      function renameGroup(from, to) {
-        for (const l of doc.links) if ((l.group || "") === from) l.group = to;
-        const gs = doc.groups;
-        const i = gs.indexOf(from);
-        if (i >= 0) {
-          if (gs.includes(to)) gs.splice(i, 1);
-          else gs[i] = to;
-        } else ensureGroup(to);
-        if (filter === from) filter = to;
-        renderAll();
-        scheduleSave();
-      }
-
-      // ---------- 搜索 / 快捷键 ----------
+      // ---------- 事件 ----------
       $("qic").innerHTML = ICONS.search;
       $("qx").innerHTML = ICONS.close;
-      $("add").prepend(
-        (() => {
-          const s = el("span");
-          s.innerHTML = ICONS.plus;
-          return s;
-        })()
-      );
-      $("add").addEventListener("click", () => (form ? closeForm() : openForm(null)));
-
+      $("add").innerHTML = ICONS.plus + "<span>添加</span>";
+      $("home").href = location.hostname === NAV_HOST ? "https://jj-bookmark.yigegongjiang.com/" : "/";
+      $("add").addEventListener("click", () => openForm(null));
       $("q").addEventListener("input", () => {
         query = $("q").value.trim();
-        $("qx").style.display = query ? "grid" : "none";
+        $("qx").style.display = query ? "" : "none";
         renderList();
       });
       $("q").addEventListener("keydown", (e) => {
-        if (e.key !== "Enter") return;
-        e.preventDefault();
-        const first = visible()[0];
-        if (!first) return;
-        bump(first.l.url);
-        window.open(first.l.url, "_blank", "noopener");
+        if (e.key === "Escape") clearQuery();
+        if (e.key === "Enter") {
+          const first = visible()[0];
+          if (first) window.open(first.url, "_blank", "noopener,noreferrer");
+        }
       });
       $("qx").addEventListener("click", clearQuery);
       function clearQuery() {
-        query = "";
         $("q").value = "";
+        query = "";
         $("qx").style.display = "none";
         renderList();
         $("q").focus();
       }
+      $("qx").style.display = "none";
 
       document.addEventListener("keydown", (e) => {
-        const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || "");
-        if (e.key === "Escape") {
-          if (form) closeForm();
-          else if (query) clearQuery();
-          else if (typing) document.activeElement.blur();
-          return;
-        }
-        if (typing) return;
-        if (e.key === "/" || ((e.metaKey || e.ctrlKey) && e.key === "k")) {
+        const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+        if (e.key === "/" && !typing) {
           e.preventDefault();
           $("q").focus();
-          $("q").select();
-        }
-        if (e.key === "n" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        } else if (e.key === "n" && !typing && !form) {
           e.preventDefault();
           openForm(null);
+        } else if (e.key === "Escape" && form && !typing) {
+          closeForm();
         }
       });
 

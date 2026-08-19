@@ -1,6 +1,6 @@
 import Foundation
 
-// 与 data-model §3 对齐的只读模型（App 侧仅解码 CLI `ls --json` 输出用于展示）。
+// 与 data-model §3 对齐的只读模型（App 侧解码共享数据文件用于展示）。
 // nonisolated：纯值类型，可在任意线程解码/传递（避开 defaultIsolation(MainActor) 限制）。
 nonisolated struct Bookmark: Identifiable, Sendable, Hashable {
     var id: Int64
@@ -54,7 +54,7 @@ extension Bookmark: Decodable {
     }
 }
 
-// CLI `--json` 顶层契约 { version, sources: { name: [...] } }；source 注入内存模型。
+// 顶层契约 { version, sources: { name: [...] } }（数据文件与 CLI `--json` 同构）；source 注入内存模型。
 nonisolated struct BookmarkStore: Sendable {
     var version: Int
     var bookmarks: [Bookmark]
@@ -95,5 +95,34 @@ extension Bookmark {
             .joined(separator: " ")
             .lowercased()
         return terms.allSatisfy { searchable.contains($0) }
+    }
+}
+
+// 读侧集成面 = 共享数据文件本身：原子 rename 保证永远读到某个完整版本（CLI store.rs），
+// 故只读消费者无需加锁、无需经 CLI。写操作仍全部经 CLI（锁 / 原子写 / 校验不复刻）。
+nonisolated extension BookmarkStore {
+    /// App 支持的最高 schema version（对齐 CLI `CURRENT_VERSION`）。
+    static let supportedVersion = 3
+
+    enum LoadError: LocalizedError {
+        case versionTooNew(Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .versionTooNew(let v):
+                return "data file version \(v) is newer than this app supports (\(BookmarkStore.supportedVersion))"
+            }
+        }
+    }
+
+    /// 全量加载；文件不存在 = 空库。
+    static func loadFromDisk() throws -> [Bookmark] {
+        let url = AppPaths.dataDirectory().appendingPathComponent("bookmarks.json")
+        guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+        let store = try JSONDecoder().decode(Self.self, from: try Data(contentsOf: url))
+        guard store.version <= supportedVersion else {
+            throw LoadError.versionTooNew(store.version)
+        }
+        return store.bookmarks
     }
 }

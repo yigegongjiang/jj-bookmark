@@ -1,7 +1,7 @@
 import Foundation
 
 // 定位并调用内嵌的同版本 CLI（bundle 内 Contents/Helpers/jj-bookmark）。
-// 所有数据侧操作（加载 / 写）经此处 Process 调用；App 不复刻读写协议。
+// 所有写操作经此处 Process 调用（App 不复刻读写协议）；读走共享数据文件（BookmarkStore.loadFromDisk）。
 nonisolated struct CLIRunner: Sendable {
     let executableURL: URL
 
@@ -69,13 +69,7 @@ nonisolated struct CLIRunner: Sendable {
         return outBox.data
     }
 
-    /// 加载全量书签（`--source all ls --json`；无 `--source` 只取 default）。CLI 保证 --json 失败以非零码报错，不吐半截 JSON。
-    func loadAll() throws -> [Bookmark] {
-        let data = try run(["--source", "all", "ls", "--json"])
-        return try JSONDecoder().decode(BookmarkStore.self, from: data).bookmarks
-    }
-
-    // MARK: - 写操作（全部经 CLI，App 不复刻锁/原子写）
+    // MARK: - 写操作（全部经 CLI，App 不复刻锁/原子写）；每条命令显式带该书签所属 source
 
     /// 新增书签，返回新 id（从 CLI stdout "Added #<id>" 解析）。
     @discardableResult
@@ -91,16 +85,20 @@ nonisolated struct CLIRunner: Sendable {
         return Int64(digits)
     }
 
-    func edit(id: Int64, title: String, url: String, excerpt: String, note: String, folder: String) throws {
+    func edit(source: String, id: Int64, title: String, url: String, excerpt: String, note: String, folder: String) throws {
         // 编辑面板一次提交全部字段（含清空为 ""）。
-        try run(["--source", "all", "apply", String(id),
+        try run(["--source", source, "apply", String(id),
                  "--title", title, "--url", url, "--excerpt", excerpt,
                  "--note", note, "--folder", folder])
     }
 
-    func remove(id: Int64) throws { try run(["--source", "all", "apply", String(id), "--delete"]) }
+    func remove(source: String, id: Int64) throws {
+        try run(["--source", source, "apply", String(id), "--delete"])
+    }
 
-    func open(id: Int64) throws { try run(["--source", "all", "open", String(id)]) }
+    func open(source: String, id: Int64) throws {
+        try run(["--source", source, "open", String(id)])
+    }
 
     func moveFolder(source: String, from old: String, to new: String) throws {
         try run(["--source", source, "mv", old, new])

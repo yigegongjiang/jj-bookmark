@@ -11,6 +11,18 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.23.0] - 2026-08-19
+
+### Changed
+
+- 作用域彻底简化为单一真实 source：`--source <NAME>` 只收真实 source 名，省略即 `default`（= `apply <URL>` 的落点）；`all` / `--all` 这类「全部 source」参数不再存在
+- 按 ID 编辑 / 删除 / 打开也只在指定 source 内生效：操作其他 source 的书签需带 `--source <NAME>`（App / Raycast 会自动带上该书签所属 source，使用上无变化）
+- 文件夹改名 `mv` 恢复为只作用于目标 source，输出恢复简洁形式
+
+### Removed
+
+- 保存书签的内建指引不再跨 source 查重（只看默认 source）：其他 source 里的同一条书签不会再被提示为已存在
+
 ## [0.22.0] - 2026-08-19
 
 ### Changed

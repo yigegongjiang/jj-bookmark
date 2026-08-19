@@ -1,7 +1,7 @@
 import AppKit
 
 // 三栏主界面：左 folder 树（NSOutlineView）+ 右书签列表（NSTableView）+ 顶部搜索/排序。
-// 数据经内嵌 CLI 全量加载，即时搜索/排序在内存原生做；FSEvents 变更自动刷新。
+// 数据从共享数据文件全量加载（写仍经 CLI），即时搜索/排序在内存原生做；FSEvents 变更自动刷新。
 final class MainViewController: NSViewController, NSMenuItemValidation {
     private let runner: CLIRunner
     private var watcher: FSWatcher?
@@ -220,7 +220,7 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
         let prevFolder = selectedFolder?.stateKey
             ?? defaults.string(forKey: Self.sidebarSelectedItemKey)
         do {
-            allBookmarks = try runner.loadAll()
+            allBookmarks = try BookmarkStore.loadFromDisk()
         } catch {
             showError(error, title: L10n.errorLoadFailed)
             return
@@ -441,7 +441,7 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
             (L10n.fieldFolder, b.folder, ""),
         ]) else { return }
         performWrite {
-            try runner.edit(id: b.id, title: v[0], url: v[1], excerpt: v[2], note: v[3], folder: v[4])
+            try runner.edit(source: b.source, id: b.id, title: v[0], url: v[1], excerpt: v[2], note: v[3], folder: v[4])
         }
     }
 
@@ -457,14 +457,14 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
         alert.addButton(withTitle: L10n.btnCancel)
         alert.alertStyle = .warning
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        performWrite { for b in bms { try runner.remove(id: b.id) } }
+        performWrite { for b in bms { try runner.remove(source: b.source, id: b.id) } }
     }
 
     @objc func openSelected() {
         let bms = targetBookmarks()
         guard !bms.isEmpty else { return }
         do {
-            for b in bms { try runner.open(id: b.id) }
+            for b in bms { try runner.open(source: b.source, id: b.id) }
             reload()
             NSApp.hide(nil)
         } catch {

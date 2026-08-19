@@ -7,6 +7,19 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.23.0] - 2026-08-19
+
+- 作用域彻底简化为单一真实 source：`--source <NAME>` 只收真实 source 名，省略即 `default`（= `apply <URL>` 的落点）；`all` / `--all` 这类「全部 source」参数不再存在
+  - `Scope` 枚举 / `includes_source` / `source_for_id` / `ALL_SCOPE` / `parse_new_source` 全部退役，`ScopeArgs::resolve() -> String`；各 `cmd_*` 直接收 `source: &str`
+  - `output::print_human` 去 `show_groups`（`[source]` 分组头随之消失），`print_json` 改收 `(source, &[Bookmark])`，契约形状仍为 `{version, sources:{<source>:[...]}}`（单键）
+- 全量读改为直接解析共享数据文件，`--json` 不再有程序化消费者
+  - App 新增 `BookmarkStore.loadFromDisk()`（含 `version > 3` 上界校验），`CLIRunner` 只留写操作且每条命令显式带 `--source <该书签的 source>`；Raycast 用 `useCachedPromise` + `readFile` 取代 `useExec(ls --json)`
+  - 依据：`store.rs` 的读侧免锁保证（原子 rename ⇒ 永远读到完整版本），且 web Worker 早已直接读同一份 JSON —— 三个消费者读法统一
+- 按 ID 编辑 / 删除 / 打开只在指定 source 内生效；`mv` 恢复为只作用于目标 source
+  - `not_found(source, id)` 恒带 source 名；`cmd_mv` 的 `[default(1)]` 影响面后缀移除（跨 source 扩大已不存在）
+- 保存书签的内建指引不再跨 source 查重（只看默认 source）
+  - `before_help` 三步全部落在默认 source（第 1 步 `ls <DOMAIN>`、第 2 步 `folders`、第 3 步 `apply`）—— 发现范围与落点一致，代价是 safari 等其他 source 的重复项不会被提示
+
 ## [0.22.0] - 2026-08-19
 
 - 作用域参数定型为单个 `--source <NAME|all>`，省略即 `default` —— 与 `apply <URL>` 的落点是同一个默认值，读 / 写 / 改名不用分别记；要跨全部 source 时写 `--source all`（v0.21.0 的「省略 = 全部 source」已回退）

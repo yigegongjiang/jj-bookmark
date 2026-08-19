@@ -1,16 +1,20 @@
 import { useMemo, useState } from "react";
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { Action, ActionPanel, Icon, Keyboard, List, showHUD, showToast, Toast } from "@raycast/api";
-import { useExec } from "@raycast/utils";
+import { useCachedPromise } from "@raycast/utils";
 
 const pexec = promisify(execFile);
 
 /** source 下拉「全部」哨兵值（真 source 名不会是它）。 */
 const ALL_SOURCES = "__all__";
+
+/** 数据文件 = 读侧集成面（原子 rename 保证读到完整版本）；写仍走 CLI。 */
+const DATA_FILE = join(homedir(), ".config/jj-bookmark/bookmarks.json");
 
 /** jj-bookmark 二进制解析：优先本机符号链接 → App 内嵌 helper → PATH 兜底（固定候选，无 config knob）。 */
 const BIN: string =
@@ -65,10 +69,12 @@ export default function Command() {
   const [source, setSource] = useState(ALL_SOURCES);
   // detail 面板默认开：直接对上「尽可能一并展示细节」；⌘Y 切回紧凑列表（此时 accessories 才显示）。
   const [showDetail, setShowDetail] = useState(true);
-  // load-once：与 App/Web 前端一致，CLI 只负责 load，过滤在内存（对 CJK 最可预测）。
-  const { data, isLoading, error, revalidate } = useExec(BIN, ["--source", "all", "ls", "--json", "--sort", "visited"], {
-    keepPreviousData: true,
-  });
+  // load-once：与 App/Web 前端一致，整份数据一次读入，过滤 / 排序在内存（对 CJK 最可预测）。
+  const { data, isLoading, error, revalidate } = useCachedPromise(
+    async () => (existsSync(DATA_FILE) ? await readFile(DATA_FILE, "utf8") : '{"version":3,"sources":{}}'),
+    [],
+    { keepPreviousData: true },
+  );
 
   const items = useMemo<Bookmark[]>(() => {
     if (!data) return [];
@@ -93,8 +99,8 @@ export default function Command() {
 
   async function open(b: Bookmark) {
     try {
-      // 走 CLI open：默认浏览器打开 + 记录 last_visited（单一核心，data-side 写操作）。id 全局唯一，--source all 跨全部 source 命中。
-      await pexec(BIN, ["--source", "all", "open", String(b.id)]);
+      // 走 CLI open：默认浏览器打开 + 记录 last_visited（单一核心，data-side 写操作）；显式带该书签的 source。
+      await pexec(BIN, ["--source", b.source, "open", String(b.id)]);
       await showHUD(`Opened: ${b.title || b.url}`);
     } catch (e) {
       await showToast({ style: Toast.Style.Failure, title: "Open failed", message: String(e) });

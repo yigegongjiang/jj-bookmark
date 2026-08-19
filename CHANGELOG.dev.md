@@ -7,6 +7,13 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.19.0] - 2026-08-19
+
+- 移除网页元数据抓取：保存书签不再自动联网取标题 / 摘要 / 封面；App 新增时留空标题将保留网址原样，标题与摘要请在新增或编辑时自行填写
+  - 删 `src/fetcher.rs` + `cmd_fetch` / `fetch_and_apply`，去 `fetch` 子命令与 `apply --fetch`（含 `before_help` TL;DR 配方），Cargo 去 `reqwest` + `scraper` —— CLI 自此无出站 HTTP（`push` 仍经 wrangler 子进程）
+  - App 去 `CLIRunner.fetch` + `MainViewController.backgroundFetch`，新增书签不再起后台抓取任务
+  - `cover` 字段保留在数据模型（App 仍解码，无渲染方），避免下次原子写静默丢弃 `bookmarks.json` 已有值
+
 ## [0.18.0] - 2026-07-27
 
 - 导航页整页重做：卡片面板 + 搜索（`/` 聚焦、Enter 直开首个结果）+ 分组筛选 + 高频 / 最近 / 手动三态排序，暗亮双主题

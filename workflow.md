@@ -25,7 +25,7 @@
 - Web（`jj-bookmark-web/`）：不做本地调试 —— `wrangler dev` 无真实数据且绕过 Access，验不出真问题；代码变更直接进发布，push master 由 `deploy-web.yml` 部署
   - 视觉 / 交互改版或数据结构变更 → 部署完成后线上复核：ego-browser skill 开导航页 `https://123.yigegongjiang.com`、预览页 `https://jj-bookmark.yigegongjiang.com`
   - 手段：截图验视觉 / 合成 DragEvent 验拖拽 / 页面内 `fetch('/api/nav')` 验字段白名单与 `If-Match` 409（curl 无 Access token 必 403）
-  - 停在 Google 登录页 → 人类协助：`curl -s -G 'https://jj.yigegongjiang.com/notify' --data-urlencode 'text=jj-bookmark 线上复核需登录，请在 ego-browser 完成 Google 登录'`
+  - 停在 Google 登录页 → 人类协助：`curl -s -G 'https://jj-cloudflare.yigegongjiang.com/notify' --data-urlencode 'text=jj-bookmark 线上复核需登录，请在 ego-browser 完成 Google 登录'`
   - 复核有问题 → 修复后重走部署 + 复核
 
 # 发布

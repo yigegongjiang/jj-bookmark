@@ -1,7 +1,7 @@
 import Foundation
 
 // 定位并调用内嵌的同版本 CLI（bundle 内 Contents/Helpers/jj-bookmark）。
-// 所有数据侧操作（加载 / 写 / 抓取）经此处 Process 调用；App 不复刻读写协议。
+// 所有数据侧操作（加载 / 写）经此处 Process 调用；App 不复刻读写协议。
 nonisolated struct CLIRunner: Sendable {
     let executableURL: URL
 
@@ -90,9 +90,6 @@ nonisolated struct CLIRunner: Sendable {
         let digits = s[s.index(after: hash)...].prefix { $0.isNumber }
         return Int64(digits)
     }
-
-    /// 后台抓取元数据（best-effort，失败忽略）。
-    func fetch(id: Int64) throws { try run(["--all", "fetch", String(id)]) }
 
     func edit(id: Int64, title: String, url: String, excerpt: String, note: String, folder: String) throws {
         // 编辑面板一次提交全部字段（含清空为 ""）。

@@ -1,7 +1,6 @@
-//! jj-bookmark CLI — 唯一核心。读写协议 / 查询 / 抓取只在此实现一遍，
+//! jj-bookmark CLI — 唯一核心。读写协议 / 查询只在此实现一遍，
 //! App 经内嵌调用复用。命令见 roadmap.md，数据契约见 data-model.md。
 
-mod fetcher;
 mod filter;
 mod model;
 mod output;
@@ -13,7 +12,6 @@ mod timeutil;
 use anyhow::{Context, Result, anyhow, bail};
 use clap::{Args, Parser, Subcommand};
 use std::collections::BTreeMap;
-use std::time::Duration;
 
 use model::{Bookmark, CURRENT_VERSION, DEFAULT_SOURCE, FOLDER_SEP, Store, now_millis};
 use query::{Order, SortKey};
@@ -25,7 +23,7 @@ use store::{Paths, mutate, read_store};
     version,
     about = "Bookmark tool",
     disable_help_subcommand = true,
-    before_help = "TL;DR — save a bookmark:\n  1. Search: jj-bookmark --all query <DOMAIN>; same domain = strong match; ask: add or edit <ID>?\n  2. Pick the closest path from jj-bookmark folders; levels are joined by `::` with no spaces (e.g. AI::claude-code); infer title and useful metadata.\n  3. jj-bookmark apply <URL> --title <TITLE> --folder <PATH> [--note <NOTE>] [--excerpt <TEXT>] [--fetch]\n     <URL> = the exact current page URL, verbatim (full path + query); NEVER substitute the bare domain or a trimmed form.\n  Edit: jj-bookmark --all apply <ID> <fields>; delete: jj-bookmark --all apply <ID> --delete."
+    before_help = "TL;DR — save a bookmark:\n  1. Search: jj-bookmark --all query <DOMAIN>; same domain = strong match; ask: add or edit <ID>?\n  2. Pick the closest path from jj-bookmark folders; levels are joined by `::` with no spaces (e.g. AI::claude-code); infer title and useful metadata.\n  3. jj-bookmark apply <URL> --title <TITLE> --folder <PATH> [--note <NOTE>] [--excerpt <TEXT>]\n     <URL> = the exact current page URL, verbatim (full path + query); NEVER substitute the bare domain or a trimmed form.\n  Edit: jj-bookmark --all apply <ID> <fields>; delete: jj-bookmark --all apply <ID> --delete."
 )]
 struct Cli {
     #[command(flatten)]
@@ -112,9 +110,6 @@ enum Command {
         /// Delete the bookmark identified by TARGET
         #[arg(long)]
         delete: bool,
-        /// Fetch metadata after adding
-        #[arg(long)]
-        fetch: bool,
     },
     /// List bookmarks (sortable)
     Ls {
@@ -150,13 +145,6 @@ enum Command {
     },
     /// Open the URL in the default browser and record the last visit
     Open { id: i64 },
-    /// Fetch and backfill metadata (title/excerpt/cover)
-    Fetch {
-        id: i64,
-        /// Overwrite existing fields (by default only empty fields are filled, never user content)
-        #[arg(long)]
-        force: bool,
-    },
     /// Rename / move a folder subtree (prefix-replace all matches, single atomic write)
     Mv {
         /// Old folder path (including all its descendants)
@@ -183,7 +171,6 @@ fn main() -> Result<()> {
             excerpt,
             set_source,
             delete,
-            fetch,
         } => {
             if let Ok(id) = target.parse::<i64>() {
                 if delete {
@@ -193,15 +180,11 @@ fn main() -> Result<()> {
                         || note.is_some()
                         || excerpt.is_some()
                         || set_source.is_some()
-                        || fetch
                     {
-                        bail!("--delete cannot be combined with fields or --fetch");
+                        bail!("--delete cannot be combined with fields");
                     }
                     cmd_rm(&paths, id, scope)
                 } else {
-                    if fetch {
-                        bail!("--fetch is only valid when TARGET is a URL");
-                    }
                     cmd_edit(
                         &paths, id, title, url, folder, note, excerpt, set_source, scope,
                     )
@@ -213,7 +196,7 @@ fn main() -> Result<()> {
                 if url.is_some() || set_source.is_some() {
                     bail!("--url/--set-source require a numeric bookmark ID");
                 }
-                cmd_add(&paths, target, title, folder, note, excerpt, fetch, scope)
+                cmd_add(&paths, target, title, folder, note, excerpt, scope)
             }
         }
         Command::Ls {
@@ -247,7 +230,6 @@ fn main() -> Result<()> {
             scope,
         ),
         Command::Open { id } => cmd_open(&paths, id, scope),
-        Command::Fetch { id, force } => cmd_fetch(&paths, id, force, scope),
         Command::Mv { old, new } => cmd_mv(&paths, old, new, scope),
         Command::Push => {
             if explicit_scope {
@@ -265,16 +247,14 @@ fn cmd_add(
     folder: Option<String>,
     note: Option<String>,
     excerpt: Option<String>,
-    fetch: bool,
     scope: Scope,
 ) -> Result<()> {
     let Scope::Source(source) = scope else {
         bail!("--all cannot be used when adding a bookmark");
     };
-    let title = title.unwrap_or_else(|| url.clone()); // 无 --title 时用 URL 占位；抓取会回填
+    let title = title.unwrap_or_else(|| url.clone()); // 无 --title 时用 URL 占位
     let folder = folder.unwrap_or_default();
     let note = note.unwrap_or_default();
-    let fetch_scope = Scope::Source(source.clone());
     let id = mutate(paths, |store| {
         if let Some(existing) = store.sources.get(&source) {
             ensure_leaf_placement(&folder, existing.iter().map(|b| b.folder.as_str()))?;
@@ -293,12 +273,6 @@ fn cmd_add(
         Ok(id)
     })?;
     println!("Added #{id}");
-    if fetch {
-        // 同步抓取；失败不回滚（书签已保存），仅告警。
-        if let Err(e) = fetch_and_apply(paths, id, false, &fetch_scope) {
-            eprintln!("Warning: metadata fetch failed (bookmark saved): {e:#}");
-        }
-    }
     Ok(())
 }
 
@@ -324,61 +298,6 @@ fn cmd_sources(paths: &Paths) -> Result<()> {
         println!("{source}\t{}", bookmarks.len());
     }
     Ok(())
-}
-
-fn cmd_fetch(paths: &Paths, id: i64, force: bool, scope: Scope) -> Result<()> {
-    fetch_and_apply(paths, id, force, &scope)?;
-    println!("Fetched #{id}");
-    Ok(())
-}
-
-/// 抓取并回填元数据。网络请求在写锁**之外**进行（避免长时间持锁阻塞其他写），
-/// 抓取完成后再加锁应用。默认只填空字段；`force` 覆盖已有内容。
-fn fetch_and_apply(paths: &Paths, id: i64, force: bool, scope: &Scope) -> Result<()> {
-    let url = {
-        let store = read_store(paths)?;
-        let source = source_for_id(&store, id, scope).ok_or_else(|| scope.not_found(id))?;
-        store.sources[&source]
-            .iter()
-            .find(|bookmark| bookmark.id == id)
-            .map(|bookmark| bookmark.url.clone())
-    }
-    .ok_or_else(|| scope.not_found(id))?;
-
-    let meta = fetcher::fetch(&url, Duration::from_secs(10))?;
-
-    mutate(paths, |store| {
-        let source = source_for_id(store, id, scope).ok_or_else(|| scope.not_found(id))?;
-        let b = store
-            .sources
-            .get_mut(&source)
-            .and_then(|bookmarks| bookmarks.iter_mut().find(|bookmark| bookmark.id == id))
-            .ok_or_else(|| scope.not_found(id))?;
-        let mut changed = false;
-        // title 占位（== url）或空时才回填，避免覆盖用户已设标题（除非 --force）。
-        if let Some(t) = meta.title
-            && (force || b.title.is_empty() || b.title == b.url)
-        {
-            b.title = t;
-            changed = true;
-        }
-        if let Some(e) = meta.excerpt
-            && (force || b.excerpt.is_empty())
-        {
-            b.excerpt = e;
-            changed = true;
-        }
-        if let Some(c) = meta.cover
-            && (force || b.cover.is_empty())
-        {
-            b.cover = c;
-            changed = true;
-        }
-        if changed {
-            b.updated = now_millis();
-        }
-        Ok(())
-    })
 }
 
 fn cmd_list(
@@ -830,7 +749,6 @@ mod tests {
                 folder.map(str::to_owned),
                 None,
                 None,
-                false,
                 default_scope(),
             )
         };

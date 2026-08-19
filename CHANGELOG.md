@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.19.0] - 2026-08-19
+
+### Removed
+
+- 移除网页元数据抓取：保存书签不再自动联网取标题 / 摘要 / 封面；App 新增时留空标题将保留网址原样，标题与摘要请在新增或编辑时自行填写
+
 ## [0.18.0] - 2026-07-27
 
 ### Changed

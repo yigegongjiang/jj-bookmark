@@ -1,6 +1,6 @@
 [package]
 name = "jj-bookmark-cli"
-version = "0.18.0"
+version = "0.19.0"
 edition = "2024"
 
 # 二进制名固定为 jj-bookmark（crate 目录名带 -cli 后缀以区分工程）。
@@ -19,11 +19,6 @@ anyhow = "1"
 jaq-core = "3.1"
 jaq-std = "3.0"
 jaq-json = "2.0"
-# 元数据抓取（Phase 4）。默认 TLS 在 macOS = Secure Transport（系统级，非 OpenSSL）；
-# charset 特性处理非 UTF-8 页面。blocking 自带运行时。
-reqwest = { version = "0.13", features = ["blocking", "gzip"] }
-scraper = "0.27"
-
 [profile.release]
 lto = true
 strip = true

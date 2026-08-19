@@ -421,22 +421,13 @@ final class MainViewController: NSViewController, NSMenuItemValidation {
         let url = v[0].trimmingCharacters(in: .whitespacesAndNewlines)
         guard !url.isEmpty else { return }
         performWrite {
-            let newID = try runner.add(
+            _ = try runner.add(
                 source: source,
                 url: url,
                 title: v[1],
                 folder: v[2],
                 note: nil
             )
-            if let id = newID { backgroundFetch(id: id) } // 后台补全元数据，完成后 FSEvents 自刷新
-        }
-    }
-
-    /// 后台抓取元数据（不阻塞 UI）；写入后经 FSEvents 触发刷新回填该行。
-    private func backgroundFetch(id: Int64) {
-        let runner = self.runner
-        Task.detached {
-            try? runner.fetch(id: id)
         }
     }
 

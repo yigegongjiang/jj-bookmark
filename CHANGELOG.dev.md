@@ -7,6 +7,11 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.23.1] - 2026-08-19
+
+- `--source` 现在放在子命令前后都生效（`jj-bookmark folders --source default` 此前报 `unexpected argument`）；每个子命令的 `--help` 也会列出它
+  - `ScopeArgs::source` 加 clap `global = true`：值仍由根 matches 汇总，`resolve()` 逻辑不变；`sources` / `push` 的显式 scope 拦截照旧（报错文案优于 clap 的 unexpected argument）
+
 ## [0.23.0] - 2026-08-19
 
 - 作用域彻底简化为单一真实 source：`--source <NAME>` 只收真实 source 名，省略即 `default`（= `apply <URL>` 的落点）；`all` / `--all` 这类「全部 source」参数不再存在

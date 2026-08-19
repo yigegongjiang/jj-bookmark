@@ -33,7 +33,7 @@ struct Cli {
 #[derive(Args, Clone, Debug)]
 struct ScopeArgs {
     /// Target source [default: default]
-    #[arg(long, value_name = "NAME", value_parser = parse_source)]
+    #[arg(long, value_name = "NAME", value_parser = parse_source, global = true)]
     source: Option<String>,
 }
 
@@ -516,21 +516,23 @@ mod tests {
     }
 
     #[test]
-    fn scope_is_root_only_and_defaults_to_default_source() {
+    fn scope_defaults_to_default_source_and_accepts_both_positions() {
         let cli = Cli::try_parse_from(["jj-bookmark", "ls"]).unwrap();
         assert_eq!(cli.scope.resolve(), DEFAULT_SOURCE);
 
         let cli = Cli::try_parse_from(["jj-bookmark", "--source", "safari", "ls"]).unwrap();
         assert_eq!(cli.scope.resolve(), "safari");
 
-        assert!(Cli::try_parse_from(["jj-bookmark", "ls", "--source", "safari"]).is_err());
+        // 子命令之后写同样成立（global arg），两种位置等价。
+        let cli = Cli::try_parse_from(["jj-bookmark", "ls", "--source", "safari"]).unwrap();
+        assert_eq!(cli.scope.resolve(), "safari");
+        let cli = Cli::try_parse_from(["jj-bookmark", "folders", "--source", "safari"]).unwrap();
+        assert_eq!(cli.scope.resolve(), "safari");
         assert!(Cli::try_parse_from(["jj-bookmark", "--all", "ls"]).is_err());
 
         let command = Cli::command();
         assert!(command.get_arguments().any(|arg| arg.get_id() == "source"));
         assert!(command.get_arguments().all(|arg| arg.get_id() != "all"));
-        let ls = command.find_subcommand("ls").unwrap();
-        assert!(ls.get_arguments().all(|arg| arg.get_id() != "source"));
     }
 
     #[test]

@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.23.1] - 2026-08-19
+
+### Fixed
+
+- `--source` 现在放在子命令前后都生效（`jj-bookmark folders --source default` 此前报 `unexpected argument '--source' found`，只能写成 `jj-bookmark --source default folders`）；每个子命令的 `--help` 也会列出它
+
 ## [0.23.0] - 2026-08-19
 
 ### Changed

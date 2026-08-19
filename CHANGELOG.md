@@ -11,6 +11,12 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.25.1] - 2026-08-19
+
+### Fixed
+
+- `sync` 缺凭据时的提示补全了最容易漏的一步（还要给 Access 应用加一条 `Service Auth` 策略，否则 Access 仍要求浏览器登录、同步报 302），并给出可直接粘贴的建文件命令
+
 ## [0.25.0] - 2026-08-19
 
 ### Added

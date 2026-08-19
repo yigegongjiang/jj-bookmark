@@ -7,6 +7,11 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.25.1] - 2026-08-19
+
+- `sync` 缺凭据时的提示补全了最容易漏的一步（还要给 Access 应用加一条 `Service Auth` 策略），并给出可直接粘贴的建文件命令
+  - `Credentials::load` 的 bail 文案改为三步式，host 从 `ENDPOINT` 现算（不再硬编码第二份域名）
+
 ## [0.25.0] - 2026-08-19
 
 - web 书签页可写：hover 出「编辑 / 删除」，右上「+ Add」新增；改动即时保存，与本地经 `jj-bookmark sync` 双向合并

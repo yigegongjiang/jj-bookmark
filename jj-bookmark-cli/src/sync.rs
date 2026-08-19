@@ -192,13 +192,22 @@ impl Credentials {
     fn load(paths: &Paths) -> Result<Credentials> {
         let path = &paths.credentials;
         if !path.exists() {
+            // 第 2 步是最容易漏的一步：只建 token 而不给应用加 Service Auth 策略，
+            // Access 会当成浏览器访问、302 去登录页，报错看起来完全不像「少了策略」。
             bail!(
-                "missing {}. Create a Cloudflare Access service token (Zero Trust → Access → \
-                 Service Auth) and save it as:\n  \
-                 {{\"client_id\": \"<...>.access\", \"client_secret\": \"<...>\"}}\n\
-                 then run: chmod 600 {}",
-                path.display(),
-                path.display()
+                "missing {path}. One-time setup — two clicks in Cloudflare, then one command:\n\
+                 \n  1. Zero Trust → Access → Service auth → Service Tokens → Create Service Token\
+                 \n  2. Zero Trust → Access → Applications → the app serving {host} → Policies →\
+                 \n     add a policy with action `Service Auth` that accepts that token\
+                 \n     (skip this and Access asks for a browser login; sync then fails with HTTP 302)\
+                 \n  3. printf '{{\"client_id\":\"<ID>\",\"client_secret\":\"<SECRET>\"}}' > {path} \\\
+                 \n       && chmod 600 {path}",
+                path = path.display(),
+                host = ENDPOINT
+                    .trim_start_matches("https://")
+                    .split('/')
+                    .next()
+                    .unwrap_or(ENDPOINT),
             );
         }
         let mode = fs::metadata(path)

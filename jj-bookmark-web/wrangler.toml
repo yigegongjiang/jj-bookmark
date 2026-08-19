@@ -1,4 +1,4 @@
-# Cloudflare Worker：只读 preview page + /api/bookmarks（读 R2）+ 导航页 /123 + /api/nav（读写 R2 nav.json）。
+# Cloudflare Worker：书签页 / + /api/bookmarks（读写 R2 bookmarks.json）+ 导航页 /123 + /api/nav（读写 R2 nav.json）。
 # 认证：Cloudflare Access（Google IdP）边缘网关 + Worker 校验 Access JWT（见 README / src/index.js）。
 # Worker 名 = jj-bookmark（与目录名 jj-bookmark-web 不同，对齐 Access 应用所配域名）。
 name = "jj-bookmark"

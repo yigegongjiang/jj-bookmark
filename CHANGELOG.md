@@ -11,6 +11,22 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.25.0] - 2026-08-19
+
+### Added
+
+- web 书签页可写：hover 出「编辑 / 删除」，右上「+ Add」新增；改动即时保存
+- 删除改为可撤销：`apply <ID> --delete` 只做标记，`--restore` 恢复，`ls --deleted` 查看已删
+
+### Changed
+
+- `jj-bookmark sync` 取代 `push`：拉云端 → 按书签逐条比最后修改时间合并 → 写回，两端都能改；同一条两端同时改则后改的胜出
+- 数据文件升级到 v4（首次写入自动完成，旧文件仍留在 `bookmarks.json.bak`）；升级后**旧版本的 jj-bookmark 无法读取**，请一并升级。已删书签永久保留在文件里（不可见、不占文件夹、编号不复用），这是两端同步不「复活」已删条目的前提；`sources` 因此会在有墓碑时多列一个 `(+N deleted)`
+
+### Removed
+
+- `push` 命令删除：它绕过冲突检查直连存储，留着会静默覆盖 web 端的编辑
+
 ## [0.24.0] - 2026-08-19
 
 ### Removed

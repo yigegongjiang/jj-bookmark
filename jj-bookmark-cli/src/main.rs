@@ -3,16 +3,16 @@
 
 mod model;
 mod output;
-mod pusher;
 mod query;
 mod store;
+mod sync;
 mod timeutil;
 
 use anyhow::{Context, Result, anyhow, bail};
 use clap::{Args, Parser, Subcommand};
 
 use model::{Bookmark, CURRENT_VERSION, DEFAULT_SOURCE, FOLDER_SEP, Store, now_millis};
-use query::{Order, SortKey};
+use query::{Order, SortKey, is_ancestor};
 use store::{Paths, mutate, read_store};
 
 #[derive(Parser)]
@@ -82,9 +82,12 @@ enum Command {
         /// Move an existing bookmark to another source
         #[arg(long, value_name = "NAME", value_parser = parse_source)]
         set_source: Option<String>,
-        /// Delete the bookmark identified by TARGET
+        /// Delete the bookmark identified by TARGET (tombstone; restore with --restore)
         #[arg(long)]
         delete: bool,
+        /// Bring a deleted bookmark back
+        #[arg(long)]
+        restore: bool,
     },
     /// List bookmarks, or search by whitespace-separated keywords (sortable)
     Ls {
@@ -96,6 +99,9 @@ enum Command {
         sort: SortKey,
         #[arg(long, value_enum)]
         order: Option<Order>,
+        /// List deleted bookmarks (tombstones) instead of live ones
+        #[arg(long)]
+        deleted: bool,
         /// Emit the --json contract (consumed by the App/scripts)
         #[arg(long)]
         json: bool,
@@ -113,8 +119,8 @@ enum Command {
         /// New folder path
         new: String,
     },
-    /// Push the local data file to Cloudflare R2 (one-way; the web is read-only)
-    Push,
+    /// Sync with the cloud copy: pull, merge, push (the web can write too)
+    Sync,
 }
 
 fn main() -> Result<()> {
@@ -132,9 +138,13 @@ fn main() -> Result<()> {
             excerpt,
             set_source,
             delete,
+            restore,
         } => {
+            if delete && restore {
+                bail!("--delete and --restore are mutually exclusive");
+            }
             if let Ok(id) = target.parse::<i64>() {
-                if delete {
+                if delete || restore {
                     if title.is_some()
                         || url.is_some()
                         || folder.is_some()
@@ -142,17 +152,18 @@ fn main() -> Result<()> {
                         || excerpt.is_some()
                         || set_source.is_some()
                     {
-                        bail!("--delete cannot be combined with fields");
+                        let flag = if delete { "--delete" } else { "--restore" };
+                        bail!("{flag} cannot be combined with fields");
                     }
-                    cmd_rm(&paths, id, &source)
+                    cmd_set_deleted(&paths, id, &source, delete)
                 } else {
                     cmd_edit(
                         &paths, id, title, url, folder, note, excerpt, set_source, &source,
                     )
                 }
             } else {
-                if delete {
-                    bail!("--delete requires a numeric bookmark ID");
+                if delete || restore {
+                    bail!("--delete/--restore require a numeric bookmark ID");
                 }
                 if url.is_some() || set_source.is_some() {
                     bail!("--url/--set-source require a numeric bookmark ID");
@@ -165,8 +176,9 @@ fn main() -> Result<()> {
             folder,
             sort,
             order,
+            deleted,
             json,
-        } => cmd_list(&paths, keyword, folder, sort, order, json, &source),
+        } => cmd_list(&paths, keyword, folder, sort, order, deleted, json, &source),
         Command::Folders => cmd_folders(&paths, &source),
         Command::Sources => {
             if explicit_scope {
@@ -176,11 +188,11 @@ fn main() -> Result<()> {
         }
         Command::Open { id } => cmd_open(&paths, id, &source),
         Command::Mv { old, new } => cmd_mv(&paths, old, new, &source),
-        Command::Push => {
+        Command::Sync => {
             if explicit_scope {
-                bail!("--source cannot be used with push; push always uploads all sources");
+                bail!("--source cannot be used with sync; sync always covers every source");
             }
-            cmd_push(&paths)
+            sync::sync(&paths)
         }
     }
 }
@@ -199,7 +211,7 @@ fn cmd_add(
     let note = note.unwrap_or_default();
     let id = mutate(paths, |store| {
         if let Some(existing) = store.sources.get(source) {
-            ensure_leaf_placement(&folder, existing.iter().map(|b| b.folder.as_str()))?;
+            ensure_leaf_placement(&folder, live_folders(existing, None))?;
         }
         let id = unique_id(store);
         let mut bookmark =
@@ -234,7 +246,13 @@ fn cmd_folders(paths: &Paths, source: &str) -> Result<()> {
     let mut folders: Vec<_> = store
         .sources
         .get(source)
-        .map(|bookmarks| bookmarks.iter().map(|b| b.folder.clone()).collect())
+        .map(|bookmarks| {
+            bookmarks
+                .iter()
+                .filter(|b| !b.deleted)
+                .map(|b| b.folder.clone())
+                .collect()
+        })
         .unwrap_or_else(Vec::new);
     folders.retain(|folder| !folder.is_empty());
     folders.sort();
@@ -247,7 +265,12 @@ fn cmd_folders(paths: &Paths, source: &str) -> Result<()> {
 
 fn cmd_sources(paths: &Paths) -> Result<()> {
     for (source, bookmarks) in read_store(paths)?.sources {
-        println!("{source}\t{}", bookmarks.len());
+        // 墓碑不计入主数字（它们对用户不可见），仅在存在时附注，便于察觉库在膨胀。
+        let live = bookmarks.iter().filter(|b| !b.deleted).count();
+        match bookmarks.len() - live {
+            0 => println!("{source}\t{live}"),
+            tombstones => println!("{source}\t{live}\t(+{tombstones} deleted)"),
+        }
     }
     Ok(())
 }
@@ -258,12 +281,16 @@ fn cmd_list(
     folder: Option<String>,
     sort: SortKey,
     order: Option<Order>,
+    deleted: bool,
     json: bool,
     source: &str,
 ) -> Result<()> {
     let mut store = read_store(paths)?;
     ensure_known_source(&store, source)?;
     let mut bookmarks = store.sources.remove(source).unwrap_or_default();
+    // 墓碑对所有读取方不可见（App / raycast 都经此 `--json` 契约消费，故只在这里过滤一次）；
+    // `--deleted` 反过来只看墓碑，用于确认误删与 `apply <ID> --restore`。
+    bookmarks.retain(|b| b.deleted == deleted);
     if let Some(keyword) = &keyword {
         bookmarks = query::keyword_filter(bookmarks, keyword);
     }
@@ -286,7 +313,11 @@ fn cmd_open(paths: &Paths, id: i64, source: &str) -> Result<()> {
         let b = store
             .sources
             .get_mut(source)
-            .and_then(|bookmarks| bookmarks.iter_mut().find(|bookmark| bookmark.id == id))
+            .and_then(|bookmarks| {
+                bookmarks
+                    .iter_mut()
+                    .find(|bookmark| bookmark.id == id && !bookmark.deleted)
+            })
             .ok_or_else(|| not_found(source, id))?;
         b.last_visited = now_millis(); // 记录访问；不改 updated（访问 ≠ 内容修改）
         Ok(b.url.clone())
@@ -332,7 +363,7 @@ fn cmd_edit(
             .get(&origin)
             .ok_or_else(|| not_found(&origin, id))?
             .iter()
-            .find(|b| b.id == id)
+            .find(|b| b.id == id && !b.deleted)
             .map(|b| b.folder.clone())
             .ok_or_else(|| not_found(&origin, id))?;
         let new_folder = folder.clone().unwrap_or_else(|| current_folder.clone());
@@ -340,12 +371,7 @@ fn cmd_edit(
             let existing: Vec<&str> = store
                 .sources
                 .get(&target)
-                .map(|v| {
-                    v.iter()
-                        .filter(|b| b.id != id)
-                        .map(|b| b.folder.as_str())
-                        .collect()
-                })
+                .map(|v| live_folders(v, Some(id)).collect())
                 .unwrap_or_default();
             ensure_leaf_placement(&new_folder, existing.into_iter())?;
         }
@@ -354,14 +380,18 @@ fn cmd_edit(
             let bookmark = store
                 .sources
                 .get_mut(&origin)
-                .and_then(|bookmarks| bookmarks.iter_mut().find(|bookmark| bookmark.id == id))
+                .and_then(|bookmarks| {
+                    bookmarks
+                        .iter_mut()
+                        .find(|bookmark| bookmark.id == id && !bookmark.deleted)
+                })
                 .ok_or_else(|| not_found(&origin, id))?;
             apply_edit_fields(bookmark, &title, &url, &folder, &note, &excerpt);
         } else {
             let bookmarks = store.sources.get_mut(&origin).expect("source exists");
             let index = bookmarks
                 .iter()
-                .position(|bookmark| bookmark.id == id)
+                .position(|bookmark| bookmark.id == id && !bookmark.deleted)
                 .expect("bookmark exists");
             let mut bookmark = bookmarks.remove(index);
             apply_edit_fields(&mut bookmark, &title, &url, &folder, &note, &excerpt);
@@ -373,17 +403,33 @@ fn cmd_edit(
     Ok(())
 }
 
-fn cmd_rm(paths: &Paths, id: i64, source: &str) -> Result<()> {
+/// 软删除 / 恢复（data-model §12）。删除不物理移除记录，只置 `deleted` 并刷新 `updated`——
+/// 墓碑是 sync 合并的正确性前提：没有它，「本地删了、远端没删」会在下次合并时复活该条。
+///
+/// 恢复不做叶子校验：它只是把记录还原到删除前的状态，那个状态当初就是合法的
+/// （与「既有放置不追溯」同一策略），并且校验失败会让误删无法撤销。
+fn cmd_set_deleted(paths: &Paths, id: i64, source: &str, deleted: bool) -> Result<()> {
     mutate(paths, |store| {
-        let bookmarks = store
+        let bookmark = store
             .sources
             .get_mut(source)
-            .filter(|bookmarks| bookmarks.iter().any(|bookmark| bookmark.id == id))
-            .ok_or_else(|| not_found(source, id))?;
-        bookmarks.retain(|bookmark| bookmark.id != id);
+            .and_then(|bookmarks| {
+                bookmarks
+                    .iter_mut()
+                    .find(|bookmark| bookmark.id == id && bookmark.deleted != deleted)
+            })
+            .ok_or_else(|| {
+                if deleted {
+                    not_found(source, id)
+                } else {
+                    anyhow!("bookmark #{id} is not deleted in source {source:?}")
+                }
+            })?;
+        bookmark.deleted = deleted;
+        bookmark.updated = now_millis(); // LWW 依据：删除 / 恢复都是内容变更，必须抬时间戳
         Ok(())
     })?;
-    println!("Deleted #{id}");
+    println!("{} #{id}", if deleted { "Deleted" } else { "Restored" });
     Ok(())
 }
 
@@ -394,7 +440,7 @@ fn cmd_mv(paths: &Paths, old: String, new: String, source: &str) -> Result<()> {
         let no_match = || anyhow!("no folder matches {old:?} in source {source:?}");
         let bookmarks = store.sources.get_mut(source).ok_or_else(no_match)?;
         let mut relocated: Vec<String> = Vec::new();
-        for bookmark in bookmarks.iter_mut() {
+        for bookmark in bookmarks.iter_mut().filter(|b| !b.deleted) {
             let new_folder = if bookmark.folder == old {
                 new.clone()
             } else if let Some(rest) = bookmark.folder.strip_prefix(&prefix) {
@@ -411,26 +457,13 @@ fn cmd_mv(paths: &Paths, old: String, new: String, source: &str) -> Result<()> {
         }
         // 叶子约束：每个被移动到的 folder 不得与本 source 内任一 folder 互为祖先。
         // 只校验涉及被移动落点的冲突，既有的无关脏数据不触发。
-        let all: Vec<&str> = bookmarks.iter().map(|b| b.folder.as_str()).collect();
+        let all: Vec<&str> = live_folders(bookmarks, None).collect();
         for folder in &relocated {
             ensure_leaf_placement(folder, all.iter().copied())?;
         }
         Ok(relocated.len())
     })?;
     println!("Moved {n} bookmark(s): {old} → {new}");
-    Ok(())
-}
-
-/// 单向同步：把本地数据文件上传到固定 Cloudflare R2 目标（经 wrangler）。web 侧只读，无 pull。
-fn cmd_push(paths: &Paths) -> Result<()> {
-    println!(
-        "Pushing {} → R2 {}/{}",
-        paths.data.display(),
-        pusher::BUCKET,
-        pusher::KEY
-    );
-    pusher::push(paths)?;
-    println!("Pushed to R2: {}/{}", pusher::BUCKET, pusher::KEY);
     Ok(())
 }
 
@@ -443,9 +476,13 @@ fn unique_id(store: &Store) -> i64 {
     id
 }
 
-/// `ancestor` 是否为 `descendant` 的严格前缀祖先（按 `FOLDER_SEP` 分段）。空路径不作祖先（未分类豁免）。
-fn is_ancestor(ancestor: &str, descendant: &str) -> bool {
-    !ancestor.is_empty() && descendant.starts_with(&format!("{ancestor}{FOLDER_SEP}"))
+/// 同 source 内**未删除**条目的 folder 路径（可排除某个 id，用于「编辑自身不与自身冲突」）。
+/// 墓碑不占 folder，故一律不参与叶子约束判定。
+fn live_folders(bookmarks: &[Bookmark], skip_id: Option<i64>) -> impl Iterator<Item = &str> {
+    bookmarks
+        .iter()
+        .filter(move |b| !b.deleted && Some(b.id) != skip_id)
+        .map(|b| b.folder.as_str())
 }
 
 /// 叶子挂载约束：书签只能挂到叶子 folder。校验把书签挂到 `folder` 是否与同 source 内
@@ -539,16 +576,7 @@ mod tests {
     fn unknown_source_errors_instead_of_empty_output() {
         let paths = temp_paths("unknown-source");
         seed(&paths, DEFAULT_SOURCE, 1, "A");
-        let error = cmd_list(
-            &paths,
-            None,
-            None,
-            SortKey::Created,
-            None,
-            false,
-            "nosuch",
-        )
-        .unwrap_err();
+        let error = list(&paths, false, "nosuch").unwrap_err();
         assert!(error.to_string().contains("unknown source"));
         assert!(cmd_folders(&paths, "nosuch").is_err());
         assert!(cmd_folders(&paths, DEFAULT_SOURCE).is_ok());
@@ -682,6 +710,100 @@ mod tests {
 
     fn default_scope() -> &'static str {
         DEFAULT_SOURCE
+    }
+
+    fn list(paths: &Paths, deleted: bool, source: &str) -> Result<()> {
+        cmd_list(paths, None, None, SortKey::Created, None, deleted, false, source)
+    }
+
+    /// 某 source 内可见（未删）与墓碑的 id。
+    fn ids(paths: &Paths, source: &str) -> (Vec<i64>, Vec<i64>) {
+        let store = read_store(paths).unwrap();
+        let bookmarks = store.sources.get(source).cloned().unwrap_or_default();
+        (
+            bookmarks.iter().filter(|b| !b.deleted).map(|b| b.id).collect(),
+            bookmarks.iter().filter(|b| b.deleted).map(|b| b.id).collect(),
+        )
+    }
+
+    #[test]
+    fn delete_leaves_a_tombstone_that_restore_can_bring_back() {
+        let paths = temp_paths("soft-delete");
+        seed(&paths, DEFAULT_SOURCE, 1, "A::B");
+        seed(&paths, DEFAULT_SOURCE, 2, "A::C");
+
+        cmd_set_deleted(&paths, 1, DEFAULT_SOURCE, true).unwrap();
+        assert_eq!(ids(&paths, DEFAULT_SOURCE), (vec![2], vec![1]), "记录仍在，只是被标记");
+
+        // 已删条目对读 / 写命令一律不可见
+        assert!(cmd_edit(&paths, 1, Some("x".into()), None, None, None, None, None, DEFAULT_SOURCE).is_err());
+        assert!(cmd_open(&paths, 1, DEFAULT_SOURCE).is_err());
+        assert!(cmd_set_deleted(&paths, 1, DEFAULT_SOURCE, true).is_err(), "重复删除应报错");
+
+        // 墓碑仍占 id：新增绝不会复用它（否则会与远端墓碑撞 id）
+        let store = read_store(&paths).unwrap();
+        assert!(store.contains_id(1));
+
+        cmd_set_deleted(&paths, 1, DEFAULT_SOURCE, false).unwrap();
+        assert_eq!(ids(&paths, DEFAULT_SOURCE), (vec![1, 2], vec![]));
+        assert!(cmd_set_deleted(&paths, 1, DEFAULT_SOURCE, false).is_err(), "未删条目不能恢复");
+        let _ = fs::remove_dir_all(&paths.dir);
+    }
+
+    #[test]
+    fn tombstones_do_not_occupy_folders_or_show_up_in_listings() {
+        let paths = temp_paths("tombstone-folders");
+        seed(&paths, DEFAULT_SOURCE, 1, "A::B::C");
+        cmd_set_deleted(&paths, 1, DEFAULT_SOURCE, true).unwrap();
+
+        // A::B::C 已成墓碑 → 祖先 A::B 重新可挂
+        assert!(
+            cmd_add(&paths, "u".into(), None, Some("A::B".into()), None, None, DEFAULT_SOURCE).is_ok()
+        );
+        // folders 不再列出墓碑的路径
+        cmd_folders(&paths, DEFAULT_SOURCE).unwrap();
+        let store = read_store(&paths).unwrap();
+        let live: Vec<&str> = store.sources[DEFAULT_SOURCE]
+            .iter()
+            .filter(|b| !b.deleted)
+            .map(|b| b.folder.as_str())
+            .collect();
+        assert_eq!(live, vec!["A::B"]);
+        // ls 默认只看活的，--deleted 只看墓碑
+        assert!(list(&paths, false, DEFAULT_SOURCE).is_ok());
+        assert!(list(&paths, true, DEFAULT_SOURCE).is_ok());
+        let _ = fs::remove_dir_all(&paths.dir);
+    }
+
+    #[test]
+    fn mv_skips_tombstones() {
+        let paths = temp_paths("mv-tombstone");
+        seed(&paths, DEFAULT_SOURCE, 1, "Old");
+        seed(&paths, DEFAULT_SOURCE, 2, "Old");
+        cmd_set_deleted(&paths, 2, DEFAULT_SOURCE, true).unwrap();
+
+        cmd_mv(&paths, "Old".into(), "New".into(), DEFAULT_SOURCE).unwrap();
+        let store = read_store(&paths).unwrap();
+        let by_id = |id: i64| {
+            store.sources[DEFAULT_SOURCE]
+                .iter()
+                .find(|b| b.id == id)
+                .unwrap()
+                .folder
+                .clone()
+        };
+        assert_eq!(by_id(1), "New");
+        assert_eq!(by_id(2), "Old", "墓碑不参与 mv");
+        let _ = fs::remove_dir_all(&paths.dir);
+    }
+
+    #[test]
+    fn sync_subcommand_replaced_push() {
+        assert!(Cli::command().find_subcommand("push").is_none());
+        assert!(Cli::command().find_subcommand("sync").is_some());
+        assert!(Cli::try_parse_from(["jj-bookmark", "apply", "1", "--restore"]).is_ok());
+        // --delete 与 --restore 互斥（在 main 分发处 bail，此处只确认二者都可解析）
+        assert!(Cli::try_parse_from(["jj-bookmark", "apply", "1", "--delete", "--restore"]).is_ok());
     }
 
     #[test]

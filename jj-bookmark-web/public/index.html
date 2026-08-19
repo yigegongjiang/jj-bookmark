@@ -142,6 +142,70 @@
         border-left: 2px solid var(--border);
       }
       .empty { padding: 40px; text-align: center; color: var(--fg-2); }
+
+      /* 行内操作：hover 才出现，避免常态视觉噪音 */
+      .row { position: relative; }
+      .row .acts {
+        position: absolute;
+        top: 6px;
+        right: 10px;
+        display: none;
+        gap: 4px;
+      }
+      .row:hover .acts { display: flex; }
+      .row .acts button {
+        font: inherit;
+        font-size: 11px;
+        padding: 2px 7px;
+        color: var(--fg);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .row .acts button:hover { border-color: var(--sel); color: var(--sel); }
+      .row .acts button.danger:hover { border-color: var(--domain); color: var(--domain); }
+      header .status { color: var(--fg-2); font-size: 12px; white-space: nowrap; }
+      header .status.err { color: var(--domain); }
+
+      /* 编辑器 */
+      dialog#editor {
+        width: min(560px, 92vw);
+        padding: 0;
+        color: var(--fg);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+      }
+      dialog#editor::backdrop { background: rgba(0, 0, 0, 0.35); }
+      #editor form { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+      #editor h2 { margin: 0; font-size: 14px; font-weight: 600; }
+      #editor label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--fg-2); }
+      #editor input, #editor textarea {
+        font: inherit;
+        font-size: 13px;
+        padding: 5px 8px;
+        color: var(--fg);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        outline: none;
+      }
+      #editor input:focus, #editor textarea:focus { border-color: var(--sel); }
+      #editor textarea { resize: vertical; min-height: 46px; }
+      #editor .pair { display: flex; gap: 10px; }
+      #editor .pair > label { flex: 1 1 0; min-width: 0; }
+      #editor .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+      #editor .actions button {
+        font: inherit;
+        padding: 5px 14px;
+        color: var(--fg);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #editor .actions button[value="save"] { color: var(--sel-fg); background: var(--sel); border-color: var(--sel); }
     </style>
   </head>
   <body>
@@ -154,12 +218,34 @@
         <option value="title">Name</option>
       </select>
       <button id="order" title="Toggle sort order">↓ Descending</button>
+      <button id="add" title="Add a bookmark">+ Add</button>
       <span class="count" id="count"></span>
+      <span class="status" id="status"></span>
     </header>
     <main>
       <nav id="sidebar"></nav>
       <section id="list"></section>
     </main>
+
+    <dialog id="editor">
+      <form method="dialog">
+        <h2 id="editor-title">Add bookmark</h2>
+        <label>URL<input id="f-url" type="text" required autocomplete="off" spellcheck="false" /></label>
+        <label>Title<input id="f-title" type="text" autocomplete="off" /></label>
+        <div class="pair">
+          <label>Source<input id="f-source" type="text" list="sources" autocomplete="off" spellcheck="false" /></label>
+          <label>Folder (:: separated)<input id="f-folder" type="text" list="folders" autocomplete="off" spellcheck="false" /></label>
+        </div>
+        <label>Excerpt<textarea id="f-excerpt" rows="2"></textarea></label>
+        <label>Note<textarea id="f-note" rows="2"></textarea></label>
+        <datalist id="sources"></datalist>
+        <datalist id="folders"></datalist>
+        <div class="actions">
+          <button value="cancel" formnovalidate>Cancel</button>
+          <button value="save" id="editor-save">Save</button>
+        </div>
+      </form>
+    </dialog>
 
     <script>
       // ---- 状态 ----
@@ -175,28 +261,101 @@
 
       const $ = (id) => document.getElementById(id);
 
+      const SCHEMA_VERSION = 4; // 与 CLI CURRENT_VERSION / Worker BOOKMARKS_VERSION 对齐
+      const DEFAULT_SOURCE = "default";
+      let STORE = { version: SCHEMA_VERSION, sources: {} }; // 写回用的完整库（含墓碑）
+      let ETAG = null; // 条件写凭据；null = 远端对象尚不存在
+
       // ---- 拉取数据 ----
+      // ALL 只保留未删除条目（墓碑对界面不可见）；STORE 保留全部，PUT 时整份写回——
+      // 丢掉墓碑等于告诉另一端「这些条目从未存在」，已删条目会在下一次合并时复活。
       async function load() {
         try {
           const r = await fetch("/api/bookmarks", { cache: "no-store" });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          ETAG = r.headers.get("ETag");
           const data = await r.json();
-          if (data.sources && typeof data.sources === "object" && !Array.isArray(data.sources)) {
-            ALL = Object.entries(data.sources).flatMap(([source, bookmarks]) =>
-              (Array.isArray(bookmarks) ? bookmarks : []).map((bookmark) => ({ ...bookmark, source }))
-            );
-          } else {
-            ALL = Array.isArray(data.bookmarks)
-              ? data.bookmarks.map((bookmark) => ({
-                  ...bookmark,
-                  source: bookmark.source || "default",
-                }))
-              : [];
-          }
+          STORE = normalizeStore(data);
+          ALL = Object.entries(STORE.sources).flatMap(([source, bookmarks]) =>
+            bookmarks.filter((b) => !b.deleted).map((bookmark) => ({ ...bookmark, source }))
+          );
+          setStatus("");
         } catch (e) {
+          STORE = { version: SCHEMA_VERSION, sources: {} };
           ALL = [];
+          setStatus(`Load failed: ${e.message}`, true);
         }
         renderSidebar();
         renderList();
+        refreshDatalists();
+      }
+
+      function normalizeStore(data) {
+        const sources = {};
+        if (data && data.sources && typeof data.sources === "object" && !Array.isArray(data.sources)) {
+          for (const [source, list] of Object.entries(data.sources)) {
+            sources[source.trim() || DEFAULT_SOURCE] = Array.isArray(list) ? list : [];
+          }
+        }
+        return { version: SCHEMA_VERSION, sources };
+      }
+
+      // ---- 写回（整份 PUT + If-Match 条件写） ----
+      // 成功后重新 load()：页面状态直接取自服务端，既不重算派生字段（*_jst 由 Worker 生成），
+      // 也顺带吸收 CLI 在此期间的写入，页面与远端永不漂移。
+      async function save(label) {
+        setStatus(`${label}…`);
+        try {
+          const r = await fetch("/api/bookmarks", {
+            method: "PUT",
+            headers: {
+              "content-type": "application/json",
+              ...(ETAG ? { "If-Match": ETAG } : {}),
+            },
+            body: JSON.stringify(STORE),
+          });
+          if (r.status === 409) {
+            await load();
+            // 提示必须在 load 之后设置：load 成功时会清空状态，先设会被抹掉，
+            // 用户就会以为保存成功了，而这次改动其实已被丢弃。
+            setStatus("Changed elsewhere — reloaded, your edit was NOT saved", true);
+            return false;
+          }
+          if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).trim()}`);
+          await load();
+          setStatus("Saved");
+          return true;
+        } catch (e) {
+          await load(); // 本地改动已被丢弃，回到服务端真相，避免界面停在假状态
+          setStatus(`Save failed (not saved): ${e.message}`, true);
+          return false;
+        }
+      }
+
+      function setStatus(text, isError) {
+        const el = $("status");
+        el.textContent = text;
+        el.classList.toggle("err", Boolean(isError));
+      }
+
+      function allIds() {
+        return new Set(Object.values(STORE.sources).flat().map((b) => b.id));
+      }
+
+      /// 与 CLI 的 data-model §7 一致：id = 当前 Unix 毫秒；撞车则 +1。墓碑也占 id，不可复用。
+      function freshId() {
+        const used = allIds();
+        let id = Date.now();
+        while (used.has(id)) id++;
+        return id;
+      }
+
+      function findRecord(id) {
+        for (const [source, list] of Object.entries(STORE.sources)) {
+          const index = list.findIndex((b) => b.id === id);
+          if (index >= 0) return { source, list, index, record: list[index] };
+        }
+        return null;
       }
 
       // ---- folder 树构建（扁平 "A::B::C" 路径 → 嵌套） ----
@@ -403,7 +562,7 @@
         if (vis.length === 0) {
           const e = document.createElement("div");
           e.className = "empty";
-          e.textContent = ALL.length === 0 ? "No bookmarks yet — push from the CLI." : "No matches.";
+          e.textContent = ALL.length === 0 ? "No bookmarks yet — add one, or sync from the CLI." : "No matches.";
           list.appendChild(e);
           return;
         }
@@ -455,7 +614,113 @@
           el.textContent = note;
           row.appendChild(el);
         }
+
+        const acts = document.createElement("div");
+        acts.className = "acts";
+        acts.appendChild(actionButton("Edit", false, () => openEditor(b.id)));
+        acts.appendChild(
+          actionButton("Delete", true, async () => {
+            const label = b.title || b.url || `#${b.id}`;
+            if (!confirm(`Delete "${label}"?`)) return;
+            const found = findRecord(b.id);
+            if (!found) return;
+            // 软删除：置墓碑并抬 updated（LWW 依据），绝不从数组里抹掉该记录
+            found.record.deleted = true;
+            found.record.updated = Date.now();
+            await save("Deleting");
+          })
+        );
+        row.appendChild(acts);
         return row;
+      }
+
+      function actionButton(label, danger, onClick) {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.textContent = label;
+        if (danger) el.className = "danger";
+        el.addEventListener("click", (e) => {
+          e.stopPropagation(); // 行本身的 click 是「打开 URL」
+          onClick();
+        });
+        return el;
+      }
+
+      // ---- 编辑器 ----
+      let editingId = null;
+
+      function refreshDatalists() {
+        const fill = (id, values) => {
+          const el = $(id);
+          el.textContent = "";
+          for (const value of values) {
+            const option = document.createElement("option");
+            option.value = value;
+            el.appendChild(option);
+          }
+        };
+        fill("sources", [...new Set([DEFAULT_SOURCE, ...Object.keys(STORE.sources)])].sort());
+        fill(
+          "folders",
+          [...new Set(ALL.map((b) => b.folder).filter(Boolean))].sort()
+        );
+      }
+
+      function openEditor(id) {
+        editingId = id;
+        const record = id === null ? null : findRecord(id)?.record;
+        const source = id === null ? selectedSource || DEFAULT_SOURCE : findRecord(id)?.source;
+        $("editor-title").textContent = record ? "Edit bookmark" : "Add bookmark";
+        $("f-url").value = record?.url || "";
+        $("f-title").value = record?.title || "";
+        $("f-source").value = source || DEFAULT_SOURCE;
+        // 新增时预填当前选中的 folder，省一次输入（选中的是 source 本身则留空）
+        $("f-folder").value = record ? record.folder || "" : selectedFolder || "";
+        $("f-excerpt").value = record?.excerpt || "";
+        $("f-note").value = record?.note || "";
+        refreshDatalists();
+        $("editor").showModal();
+      }
+
+      async function commitEditor() {
+        const url = $("f-url").value.trim();
+        if (!url) return;
+        const source = $("f-source").value.trim() || DEFAULT_SOURCE;
+        const fields = {
+          url,
+          title: $("f-title").value.trim() || url, // 与 CLI 一致：无标题时用 URL 占位
+          folder: $("f-folder").value.trim(),
+          excerpt: $("f-excerpt").value.trim(),
+          note: $("f-note").value.trim(),
+        };
+        const now = Date.now();
+
+        if (editingId === null) {
+          const id = freshId();
+          (STORE.sources[source] ||= []).push({
+            id,
+            ...fields,
+            deleted: false,
+            created: now,
+            created_jst: "", // 派生字段由 Worker 依数字主字段重算，无需客户端生成
+            updated: now,
+            updated_jst: "",
+            last_visited: 0,
+            last_visited_jst: "",
+          });
+          await save("Adding");
+          return;
+        }
+
+        const found = findRecord(editingId);
+        if (!found) return;
+        Object.assign(found.record, fields);
+        found.record.updated = now; // LWW 依据
+        if (source !== found.source) {
+          found.list.splice(found.index, 1);
+          (STORE.sources[source] ||= []).push(found.record);
+        }
+        await save("Saving");
       }
 
       // 在 url 文本里高亮可注册主域名（eTLD+1，轻量启发式，非完整 PSL）
@@ -521,6 +786,10 @@
       function syncOrderButton() {
         $("order").textContent = order === "asc" ? "↑ Ascending" : "↓ Descending";
       }
+      $("add").addEventListener("click", () => openEditor(null));
+      $("editor").addEventListener("close", () => {
+        if ($("editor").returnValue === "save") commitEditor();
+      });
 
       load();
     </script>

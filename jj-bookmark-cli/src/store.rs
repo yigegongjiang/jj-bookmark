@@ -20,6 +20,12 @@ pub struct Paths {
     pub lock: PathBuf,
     pub bak: PathBuf,
     pub tmp: PathBuf,
+    /// sync 上传体临时文件：与本次落盘内容逐字节相同，上传后删除。
+    /// 不直接上传 `data`——原子 rename 会换 inode，curl 可能读到 merge 前的旧内容，
+    /// 那样记下的 etag 就对应着一份从未校验过的远端内容。
+    pub sync: PathBuf,
+    /// Cloudflare Access service token（人类一次性写入，权限 0600）。
+    pub credentials: PathBuf,
 }
 
 impl Paths {
@@ -38,6 +44,8 @@ impl Paths {
             lock: dir.join("bookmarks.json.lock"),
             bak: dir.join("bookmarks.json.bak"),
             tmp: dir.join("bookmarks.json.tmp"),
+            sync: dir.join("bookmarks.json.sync"),
+            credentials: dir.join("credentials.json"),
             dir,
         }
     }
@@ -73,25 +81,40 @@ pub fn mutate<F, T>(paths: &Paths, f: F) -> Result<T>
 where
     F: FnOnce(&mut Store) -> Result<T>,
 {
+    mutate_capture(paths, f).map(|(result, _)| result)
+}
+
+/// 同 [`mutate`]，但额外返回**本次实际写盘的字节**。
+/// sync 用它当上传体：与磁盘内容逐字节一致，且无需回头重读文件（读回来的可能已是别的 inode）。
+pub fn mutate_capture<F, T>(paths: &Paths, f: F) -> Result<(T, Vec<u8>)>
+where
+    F: FnOnce(&mut Store) -> Result<T>,
+{
     fs::create_dir_all(&paths.dir)
         .with_context(|| format!("failed to create data directory: {}", paths.dir.display()))?;
     let _guard = FlockGuard::acquire(&paths.lock)?; // 锁在独立锁文件上
     let mut store = read_store(paths)?; // 锁内从磁盘重读，吸收并发写 / 手改
     let result = f(&mut store)?;
-    store.normalize(); // 重算所有 *_jst
-    write_atomic(paths, &store)?;
-    Ok(result)
+    store.normalize(); // 重算所有 *_jst，并把 version 升到 CURRENT_VERSION
+    let data = serialize(&store)?;
+    write_atomic(paths, &data)?;
+    Ok((result, data))
     // _guard drop → 关闭 fd → 释放 flock
 }
 
-/// 原子写：写 tmp → fsync → 备份现有 → rename 覆盖 → fsync 目录。
-fn write_atomic(paths: &Paths, store: &Store) -> Result<()> {
+/// pretty JSON + 末尾换行（data-model §6）。落盘与上传共用同一份字节，两侧永不漂移。
+fn serialize(store: &Store) -> Result<Vec<u8>> {
     let mut data = serde_json::to_vec_pretty(store).context("failed to serialize JSON")?;
     data.push(b'\n'); // 末尾换行，文件更友好
+    Ok(data)
+}
+
+/// 原子写：写 tmp → fsync → 备份现有 → rename 覆盖 → fsync 目录。
+fn write_atomic(paths: &Paths, data: &[u8]) -> Result<()> {
     {
         let mut f = File::create(&paths.tmp)
             .with_context(|| format!("failed to create temp file: {}", paths.tmp.display()))?;
-        f.write_all(&data).context("failed to write temp file")?;
+        f.write_all(data).context("failed to write temp file")?;
         f.sync_all().context("failed to fsync temp file")?;
     }
     if paths.data.exists() {
@@ -224,7 +247,7 @@ mod tests {
                 "".into(),
             ));
         disk.normalize();
-        write_atomic(&p, &disk).unwrap();
+        write_atomic(&p, &serialize(&disk).unwrap()).unwrap();
         // 再 mutate 加第三条：因锁内重读，应基于「磁盘上两条」之上追加
         mutate(&p, |s| {
             assert_eq!(s.total_len(), 2, "mutate 必须重读到磁盘最新状态");

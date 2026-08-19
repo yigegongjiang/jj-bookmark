@@ -29,6 +29,7 @@ interface Bookmark {
   excerpt: string;
   note: string;
   folder: string;
+  deleted: boolean;
   updated: number;
   last_visited: number;
   last_visited_jst: string;
@@ -69,7 +70,7 @@ export default function Command() {
   const [showDetail, setShowDetail] = useState(true);
   // load-once：与 App/Web 前端一致，整份数据一次读入，过滤 / 排序在内存（对 CJK 最可预测）。
   const { data, isLoading, error, revalidate } = useCachedPromise(
-    async () => (existsSync(DATA_FILE) ? await readFile(DATA_FILE, "utf8") : '{"version":3,"sources":{}}'),
+    async () => (existsSync(DATA_FILE) ? await readFile(DATA_FILE, "utf8") : '{"version":4,"sources":{}}'),
     [],
     { keepPreviousData: true },
   );
@@ -78,7 +79,10 @@ export default function Command() {
     if (!data) return [];
     try {
       const store: Store = JSON.parse(data);
-      const flat = Object.entries(store.sources).flatMap(([src, arr]) => arr.map((b) => ({ ...b, source: src })));
+      const flat = Object.entries(store.sources).flatMap(([src, arr]) =>
+        // 墓碑（deleted）对界面不可见，但仍留在文件里供同步合并使用（data-model §12）
+        arr.filter((b) => !b.deleted).map((b) => ({ ...b, source: src })),
+      );
       // 排序：最后打开时间(last_visited)倒序；未打开过(=0)并列时退回 updated 倒序 → 最近打开置顶，其余按最近更新。
       flat.sort((a, b) => b.last_visited - a.last_visited || b.updated - a.updated);
       return flat;

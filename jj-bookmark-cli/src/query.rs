@@ -62,6 +62,12 @@ pub fn keyword_filter(bms: Vec<Bookmark>, keyword: &str) -> Vec<Bookmark> {
         .collect()
 }
 
+/// `ancestor` 是否为 `descendant` 的严格前缀祖先（按 `FOLDER_SEP` 分段）。
+/// 空路径不作祖先（未分类豁免，data-model §5）。落点校验（main）与合并后体检（sync）共用此判定。
+pub fn is_ancestor(ancestor: &str, descendant: &str) -> bool {
+    !ancestor.is_empty() && descendant.starts_with(&format!("{ancestor}{FOLDER_SEP}"))
+}
+
 /// folder 子树过滤：命中该 folder 本身或其后代（前缀 + `FOLDER_SEP`）。
 pub fn folder_filter(bms: Vec<Bookmark>, folder: &str) -> Vec<Bookmark> {
     let prefix = format!("{folder}{FOLDER_SEP}");

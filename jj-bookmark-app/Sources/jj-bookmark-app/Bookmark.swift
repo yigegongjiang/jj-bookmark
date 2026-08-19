@@ -10,6 +10,9 @@ nonisolated struct Bookmark: Identifiable, Sendable, Hashable {
     var excerpt: String
     var note: String
     var folder: String
+    /// 软删除墓碑（data-model §12）。App 不展示墓碑，故 `loadFromDisk` 直接滤掉；
+    /// 保留字段只为解码完整，界面层无需感知。
+    var deleted: Bool
     var created: Int64
     var createdJst: String
     var updated: Int64
@@ -20,7 +23,7 @@ nonisolated struct Bookmark: Identifiable, Sendable, Hashable {
 
 extension Bookmark: Decodable {
     enum CodingKeys: String, CodingKey {
-        case id, source, title, url, excerpt, note, folder
+        case id, source, title, url, excerpt, note, folder, deleted
         case created
         case createdJst = "created_jst"
         case updated
@@ -39,6 +42,7 @@ extension Bookmark: Decodable {
         excerpt = try c.decodeIfPresent(String.self, forKey: .excerpt) ?? ""
         note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
         folder = try c.decodeIfPresent(String.self, forKey: .folder) ?? ""
+        deleted = try c.decodeIfPresent(Bool.self, forKey: .deleted) ?? false
         created = try c.decodeIfPresent(Int64.self, forKey: .created) ?? 0
         createdJst = try c.decodeIfPresent(String.self, forKey: .createdJst) ?? ""
         updated = try c.decodeIfPresent(Int64.self, forKey: .updated) ?? 0
@@ -96,7 +100,7 @@ extension Bookmark {
 // 故只读消费者无需加锁、无需经 CLI。写操作仍全部经 CLI（锁 / 原子写 / 校验不复刻）。
 nonisolated extension BookmarkStore {
     /// App 支持的最高 schema version（对齐 CLI `CURRENT_VERSION`）。
-    static let supportedVersion = 3
+    static let supportedVersion = 4
 
     enum LoadError: LocalizedError {
         case versionTooNew(Int)
@@ -117,6 +121,6 @@ nonisolated extension BookmarkStore {
         guard store.version <= supportedVersion else {
             throw LoadError.versionTooNew(store.version)
         }
-        return store.bookmarks
+        return store.bookmarks.filter { !$0.deleted } // 墓碑对界面不可见（data-model §12）
     }
 }

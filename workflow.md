@@ -16,14 +16,17 @@
 四组件各自独立调试。
 
 - CLI（`jj-bookmark-cli/`）：`cargo check` / `cargo test` / `cargo run -- --help`
+  - 碰真实数据的手动验证 → 复制数据文件到临时 HOME 再跑：`HOME=<tmp> ./target/release/jj-bookmark ...`（`Paths::resolve` 只认 `HOME`）
+  - `sync` 需 `~/.config/jj-bookmark/credentials.json`，建法见 [jj-bookmark-web/README.md](./jj-bookmark-web/README.md) 前置
 - App（`jj-bookmark-app/`）：
   - 快编（本机架构，不组 bundle）：`cd jj-bookmark-app && swift build`
   - 组 `.app`（Release + 内嵌同版本 CLI）：`./jj-bookmark-app/package.sh [host|universal]`  # 默认 host；universal 供 CI
   - 运行：`open jj-bookmark-app/build/jj-bookmark.app`
   - 跨进程刷新：改 `~/.config/jj-bookmark/bookmarks.json` 后 App 不重启即刷新（FSEvents）
 - Raycast（`raycast/`，dev-only 不发布）：`cd raycast && npm run dev` / `npm run lint`
-- Web（`jj-bookmark-web/`）：不做本地调试 —— `wrangler dev` 无真实数据且绕过 Access，验不出真问题；代码变更直接进发布，push master 由 `deploy-web.yml` 部署
-  - 视觉 / 交互改版或数据结构变更 → 部署完成后线上复核：ego-browser skill 开导航页 `https://123.yigegongjiang.com`、预览页 `https://jj-bookmark.yigegongjiang.com`
+- Web（`jj-bookmark-web/`）：不用 `wrangler dev`（无真实数据且绕过 Access，验不出真问题）；代码变更直接进发布，push master 由 `deploy-web.yml` 部署
+  - 改到写路径（页面增删改 / `/api/*` 的 PUT）→ 先在本地同源桩上跑通增 / 改 / 删 / 409 再部署；页面可写，坏代码上线会直接改坏真实数据
+  - 视觉 / 交互改版或数据结构变更 → 部署完成后线上复核：ego-browser skill 开 `https://jj-bookmark.yigegongjiang.com`（书签页 `/`、导航页 `/123`）
   - 手段：截图验视觉 / 合成 DragEvent 验拖拽 / 页面内 `fetch('/api/nav')` 验字段白名单与 `If-Match` 409（curl 无 Access token 必 403）
   - 停在 Google 登录页 → 人类协助：`curl -s -G 'https://jj-cloudflare.yigegongjiang.com/notify' --data-urlencode 'text=jj-bookmark 线上复核需登录，请在 ego-browser 完成 Google 登录'`
   - 复核有问题 → 修复后重走部署 + 复核

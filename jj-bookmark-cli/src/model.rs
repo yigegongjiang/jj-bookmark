@@ -6,7 +6,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub const CURRENT_VERSION: u32 = 3;
+pub const CURRENT_VERSION: u32 = 4;
 pub const DEFAULT_SOURCE: &str = "default";
 /// folder 层级分隔符：无空格，避免 AI 写路径时被空格挤压致格式漂移。段名不得含此串。
 pub const FOLDER_SEP: &str = "::";
@@ -40,7 +40,8 @@ impl Default for Store {
     }
 }
 
-/// 兼容读取 v1/v2 的扁平 `{bookmarks:[{source,...}]}`，下一次写入自动升级为 v3。
+/// 兼容读取 v1/v2 的扁平 `{bookmarks:[{source,...}]}`，下一次写入自动升级为 v4。
+/// v3（无 `deleted` 字段）经 serde default 补 `false`，无需专门迁移分支。
 impl<'de> Deserialize<'de> for Store {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -118,6 +119,14 @@ impl Store {
         self.sources.values().map(Vec::len).sum()
     }
 
+    /// 全部条目（**含墓碑**）的 `(source, bookmark)` 迭代。sync 合并须看到墓碑，故不过滤。
+    pub fn iter_with_source(&self) -> impl Iterator<Item = (&str, &Bookmark)> {
+        self.sources
+            .iter()
+            .flat_map(|(source, bookmarks)| bookmarks.iter().map(move |b| (source.as_str(), b)))
+    }
+
+    /// id 唯一性检查覆盖墓碑：已删条目的 id 不可复用，否则新条目会与远端墓碑撞 id。
     pub fn contains_id(&self, id: i64) -> bool {
         self.sources
             .values()
@@ -140,6 +149,10 @@ pub struct Bookmark {
     pub note: String,
     #[serde(default)]
     pub folder: String,
+    /// 软删除墓碑（data-model §12）：删除 = 置 `true` + 刷新 `updated`，永不物理移除。
+    /// 墓碑是 sync 合并的正确性前提——没有它，「一端删、另一端未删」会让已删条目复活。
+    #[serde(default)]
+    pub deleted: bool,
     #[serde(default)]
     pub created: i64,
     #[serde(default)]
@@ -164,6 +177,7 @@ impl Bookmark {
             excerpt: String::new(),
             note,
             folder,
+            deleted: false,
             created: now,
             created_jst: String::new(),
             updated: now,
@@ -215,6 +229,31 @@ mod tests {
         assert_eq!(grouped["version"], CURRENT_VERSION);
         assert!(grouped.get("bookmarks").is_none());
         assert!(grouped["sources"]["safari"][0].get("source").is_none());
+    }
+
+    #[test]
+    fn v3_without_deleted_reads_as_alive_and_upgrades_to_v4() {
+        let raw = serde_json::json!({
+            "version": 3,
+            "sources": { "default": [{ "id": 1, "title": "t", "updated": 5 }] }
+        });
+        let mut store: Store = serde_json::from_value(raw).unwrap();
+        assert!(!store.sources["default"][0].deleted, "v3 条目缺字段应视为未删除");
+        store.normalize();
+        let out = serde_json::to_value(&store).unwrap();
+        assert_eq!(out["version"], 4);
+        assert_eq!(out["sources"]["default"][0]["deleted"], false);
+    }
+
+    #[test]
+    fn tombstones_are_visible_to_iteration_and_id_reuse_check() {
+        let mut store = Store::default();
+        let mut dead = Bookmark::new(7, "u".into(), "t".into(), "".into(), "".into());
+        dead.deleted = true;
+        store.sources.insert("safari".into(), vec![dead]);
+        assert!(store.contains_id(7), "墓碑仍占用 id，不可复用");
+        let seen: Vec<_> = store.iter_with_source().map(|(s, b)| (s, b.id)).collect();
+        assert_eq!(seen, vec![("safari", 7)]);
     }
 
     #[test]

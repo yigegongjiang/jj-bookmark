@@ -1,5 +1,5 @@
-// Worker 入口：/api/bookmarks 读 R2 数据；/api/nav 读写导航页数据；其余路由交静态资源。
-// 页面两张：/ = 只读 preview page；/123 = 个人导航页（hao123 式，web 即唯一 CRUD 入口）。
+// Worker 入口：/api/bookmarks 读写 R2 书签数据；/api/nav 读写导航页数据；其余路由交静态资源。
+// 页面两张：/ = 书签页（读写，与 CLI sync 双向收敛）；/123 = 个人导航页（web 即唯一 CRUD 入口）。
 // 自定义域 123.yigegongjiang.com 指向同一 Worker，host 命中即渲染导航页（路径无语义）。
 //
 // 认证 = 双层：① Cloudflare Access 在边缘按 Google 登录网关；② 本 Worker 再校验
@@ -7,7 +7,12 @@
 // run_worker_first=true 使**所有**请求先经此校验，页面与 API 都不裸奔。
 // CF_ACCESS_TEAM_DOMAIN / CF_ACCESS_AUD 缺任一则跳过 ②，仅靠 ①（便于本地 dev / 未配场景）。
 
-const R2_KEY = "bookmarks.json"; // 与 CLI push 固定 key 对齐（data-model 顶层 {version,bookmarks}）
+const R2_KEY = "bookmarks.json"; // 与 CLI sync 固定 key 对齐（data-model 顶层 {version,sources}）
+const BOOKMARKS_VERSION = 4; // data-model schema v4（含 deleted 墓碑）；与 CLI CURRENT_VERSION 同步
+const BOOKMARKS_MAX_BYTES = 8 * 1024 * 1024; // 真实数据 ~0.9 MB；留足增长余量，同时挡住失控写入
+const MAX_SOURCES = 100;
+const MAX_BOOKMARKS = 50000;
+const MAX_TIMESTAMP = 4102444800000; // 2100-01-01Z，超出即视为脏数据（Date 越界会抛）
 const NAV_KEY = "nav.json"; // 导航页数据（同 bucket；仅经 /api/nav 读写，无本地副本）
 const NAV_HOST = "123.yigegongjiang.com";
 const NAV_MAX_BYTES = 512 * 1024;
@@ -26,17 +31,7 @@ export default {
 
     const url = new URL(request.url);
     if (url.pathname === "/api/bookmarks") {
-      const obj = await env.BOOKMARKS.get(R2_KEY);
-      // 首次 push 前对象不存在 → 返回空库，页面渲染空态而非 500
-      if (!obj) {
-        return jsonResponse(JSON.stringify({ version: 3, sources: {} }));
-      }
-      return new Response(obj.body, {
-        headers: {
-          "content-type": "application/json; charset=utf-8",
-          "cache-control": "no-store", // 单向同步，永远取最新 push
-        },
-      });
+      return handleBookmarks(request, env);
     }
     if (url.pathname === "/api/nav") {
       return handleNav(request, env);
@@ -51,6 +46,141 @@ export default {
     return env.ASSETS.fetch(request);
   },
 };
+
+// ---- 书签数据（R2 bookmarks.json；CLI 与 web 双向写，靠 ETag CAS 收敛） ----
+
+/// GET → 全量库（原样透传 R2 对象）+ `ETag` 响应头；对象缺失 = 空库、无 ETag。
+/// PUT → 服务端白名单重建后整份覆写；`If-Match` 走 R2 条件写（onlyIf.etagMatches），失配 409。
+///
+/// 缺 `If-Match` 时只允许「对象尚不存在」这一种情况（head 命中即 409）——否则一个不带条件的
+/// PUT 会静默盖掉另一端刚写的内容，CAS 就成了摆设。
+async function handleBookmarks(request, env) {
+  if (request.method === "GET") {
+    const obj = await env.BOOKMARKS.get(R2_KEY);
+    // 首次 sync 前对象不存在 → 返回空库，页面渲染空态而非 500
+    if (!obj) {
+      return jsonResponse(JSON.stringify({ version: BOOKMARKS_VERSION, sources: {} }));
+    }
+    return new Response(obj.body, {
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store", // 双向同步，永远取最新写入
+        etag: obj.httpEtag,
+      },
+    });
+  }
+  if (request.method === "PUT") {
+    const raw = await request.text();
+    if (raw.length > BOOKMARKS_MAX_BYTES) return textError(413, "payload too large");
+    let doc;
+    try {
+      doc = JSON.parse(raw);
+    } catch {
+      return textError(400, "invalid JSON");
+    }
+    const clean = sanitizeStore(doc);
+    if (typeof clean === "string") return textError(400, clean);
+
+    const ifMatch = bareEtag(request.headers.get("If-Match"));
+    if (!ifMatch && (await env.BOOKMARKS.head(R2_KEY))) {
+      return textError(409, "If-Match required: the object already exists");
+    }
+    const res = await env.BOOKMARKS.put(R2_KEY, JSON.stringify(clean, null, 2) + "\n", {
+      httpMetadata: { contentType: "application/json" },
+      ...(ifMatch ? { onlyIf: { etagMatches: ifMatch } } : {}),
+    });
+    if (!res) return textError(409, "etag mismatch"); // 条件写失配 → 客户端重新拉取再合并
+    return new Response(JSON.stringify({ etag: res.etag }), {
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        etag: res.httpEtag,
+      },
+    });
+  }
+  return textError(405, "method not allowed");
+}
+
+/// HTTP 头里的 etag 带引号、可能带弱校验前缀 `W/`；R2 的 `etagMatches` 要裸值。
+function bareEtag(value) {
+  if (!value) return null;
+  const bare = value.trim().replace(/^W\//, "").replace(/^"|"$/g, "");
+  return bare || null;
+}
+
+/// 校验并按白名单重建书签库；合法返回重建后的对象，非法返回错误消息字符串。
+///
+/// 取舍：**结构错误才拒绝，字段值一律强转**。字段值上没有长度上限（整体已被
+/// BOOKMARKS_MAX_BYTES 兜住），因为一条超长 excerpt 让整次 PUT 失败 = 两端永远同步不上，
+/// 代价远大于收益。URL 不校验协议——真实数据里存在非 http(s) 条目。
+function sanitizeStore(doc) {
+  if (!doc || typeof doc !== "object" || Array.isArray(doc)) return "doc must be an object";
+  if (doc.version !== BOOKMARKS_VERSION) return `unsupported version (want ${BOOKMARKS_VERSION})`;
+  if (!doc.sources || typeof doc.sources !== "object" || Array.isArray(doc.sources)) {
+    return "sources must be an object";
+  }
+  const names = Object.keys(doc.sources);
+  if (names.length > MAX_SOURCES) return "too many sources";
+
+  const sources = {};
+  const seenIds = new Set();
+  for (const name of names) {
+    const list = doc.sources[name];
+    if (!Array.isArray(list)) return `source ${JSON.stringify(name)} must be an array`;
+    const source = name.trim() || "default"; // 与 CLI normalize_source 一致
+    const target = (sources[source] ||= []);
+    for (const b of list) {
+      if (!b || typeof b !== "object" || Array.isArray(b)) return "bookmark must be an object";
+      // id 是合并的唯一键：缺失或重复都会让 LWW 失去意义，属结构错误，必须拒绝
+      if (!Number.isFinite(b.id)) return "bookmark id must be a number";
+      const id = Math.floor(b.id);
+      if (seenIds.has(id)) return `duplicate bookmark id ${id}`;
+      seenIds.add(id);
+      if (seenIds.size > MAX_BOOKMARKS) return "too many bookmarks";
+
+      const created = clampTimestamp(b.created);
+      const updated = clampTimestamp(b.updated);
+      const lastVisited = clampTimestamp(b.last_visited);
+      target.push({
+        id,
+        title: text(b.title),
+        url: text(b.url),
+        excerpt: text(b.excerpt),
+        note: text(b.note),
+        folder: text(b.folder),
+        deleted: b.deleted === true,
+        created,
+        created_jst: jst(created),
+        updated,
+        updated_jst: jst(updated),
+        last_visited: lastVisited,
+        last_visited_jst: lastVisited === 0 ? "" : jst(lastVisited),
+      });
+    }
+  }
+  // 空组不落盘（与 CLI normalize 一致）；键排序令输出稳定，避免无意义的 etag 抖动
+  const ordered = {};
+  for (const source of Object.keys(sources).sort()) {
+    if (sources[source].length) ordered[source] = sources[source];
+  }
+  return { version: BOOKMARKS_VERSION, sources: ordered };
+}
+
+function text(value) {
+  return typeof value === "string" ? value : "";
+}
+
+function clampTimestamp(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(Math.max(Math.floor(value), 0), MAX_TIMESTAMP);
+}
+
+/// epoch 毫秒 → `YYYY-MM-DD HH:MM:SS+09:00`。JST 恒为 UTC+9（日本无夏令时），
+/// 故「+9h 后按 UTC 格式化」与 CLI 的 timeutil.rs 逐字节等价。派生值一律服务端重算，
+/// 不信任客户端传来的 *_jst——否则 web 写入可能留下与数字主字段矛盾的可读串。
+function jst(ms) {
+  return new Date(ms + 9 * 3600 * 1000).toISOString().slice(0, 19).replace("T", " ") + "+09:00";
+}
 
 // ---- 导航页数据（R2 nav.json，页面即唯一数据源） ----
 

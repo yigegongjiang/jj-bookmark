@@ -7,6 +7,34 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.25.0] - 2026-08-19
+
+- web 书签页可写：hover 出「编辑 / 删除」，右上「+ Add」新增；改动即时保存，与本地经 `jj-bookmark sync` 双向合并
+  - `public/index.html`：`STORE`（完整库，含墓碑）与 `ALL`（派生展示列表，滤墓碑）分离——写回丢墓碑 = 告诉另一端「从未存在」→ 复活
+  - 保存成功后重新 `load()`（不本地重算 `*_jst`、顺带吸收 CLI 期间的写入）；409 的提示必须在 `load()` **之后**设置，否则被 `setStatus("")` 抹掉，用户会误以为存上了
+  - Worker `handleBookmarks`：GET 带 `ETag`（`obj.httpEtag`）；PUT = `sanitizeStore` 白名单重建 + `If-Match`→`onlyIf.etagMatches`→409；缺 `If-Match` 时先 `head`，对象已存在即 409（否则无条件写让 CAS 失效）
+  - `sanitizeStore` 取舍：结构错误（`version`≠4 / `id` 非数字 / `id` 重复）才 400，字段值一律强转、不设长度上限 —— 一条超长 excerpt 让 PUT 失败 = 两端永远同步不上；URL 不校验协议（真实数据有 4 条非 http(s)）
+  - Worker 的 `jst()` 与 CLI `timeutil.rs` 已用全量数据逐条比对（3906/3906 一致），两侧序列化对 1302 条真实数据**逐字节相同**
+- `jj-bookmark sync` 取代 `push`：拉云端 → 按书签逐条比最后修改时间合并 → 写回；两端同时改同一条时后改的胜出
+  - 新增 `sync.rs`；合并 = 全局 id map → 记录级 LWW（比 `updated`）→ `last_visited` 取 max → 按胜者 source 重新分组；三条规则幂等 + 可交换 ⇒ 收敛（有 `merge_is_idempotent_and_commutative` 测试）
+  - 必须全局摊平再合并：按 source 分别合并会把「一边移动 source、一边编辑」的记录复制成两条
+  - `last_visited` 取 max 而非跟随胜者：它不是内容修改（§10），跟随会抹掉另一端的访问时间、破坏 visited 排序
+  - HTTP 走系统 `curl`（不引入 rustls/ring，universal 交叉编译零风险）；参数经 `--config -`（stdin）⇒ service token 不进 argv/`ps`；`%header{etag}` 取 ETag，响应从**末尾**切两行（409 的 body 是纯文本、etag 可能为空）
+  - 不跟随重定向：Access 拒绝时 302 到登录页，跟随会伪装成 200 HTML
+  - 上传体写独立 `bookmarks.json.sync`（0600）而非直接传 `bookmarks.json`：后者被原子 rename 换 inode，curl 可能读到 merge 前的内容，记下的 etag 就对应一份从未校验过的远端状态
+  - `store.rs` 拆出 `mutate_capture`：返回本次落盘字节，上传体与磁盘内容同源，永不漂移
+  - 认证 = Access service token（`CF-Access-Client-Id/Secret`）；Worker 现有 JWT 校验（`iss`/`aud`/`exp`/RS256）原样通过，service token 只是把 `email` 换成 `common_name`
+  - 合并后可能违反叶子挂载约束 → `leaf_violations` 只 warning，不阻断（阻断 = 两端永远同步不上）
+- 删除改为可撤销：`apply <ID> --delete` 只做标记，`--restore` 恢复，`ls --deleted` 查看已删
+  - `cmd_rm` → `cmd_set_deleted`；删除 / 恢复都抬 `updated`（LWW 依据）；`--restore` 不做叶子校验（恢复到删除前的合法状态，校验失败会让误删无法撤销）
+  - `edit` / `open` / `mv` / `folders` / 叶子校验（`live_folders`）一律跳过墓碑；`contains_id` 保留墓碑（id 不可复用，否则撞另一端墓碑）
+- 数据文件升级到 v4；升级后旧版本的 jj-bookmark 将无法读取
+  - `Bookmark.deleted` + `CURRENT_VERSION = 4`；v3 缺字段经 serde `default` 补 `false`，无迁移分支
+  - 读侧过滤须**逐端**实现（v0.23.0 起 App/raycast 直接读文件，不再经 `ls --json`）：CLI `ls`、App `loadFromDisk()`、raycast 摊平处、web 派生 `ALL` 处；App `supportedVersion` 同步升 4，否则升级后 App 直接拒读
+- `push` 命令删除：它绕过冲突检查直连存储，留着会静默覆盖 web 端的编辑
+  - `pusher.rs` 删除（wrangler + R2 直连，无 CAS）；`is_ancestor` 从 `main.rs` 提到 `query.rs`，与 sync 的合并后体检共用
+  - `data-model.md` 重写：补 §12 同步协议，并把 §2/§4/§6/§9/§11 从 v1 扁平结构 + 内嵌 jq 引擎的陈述订正到现状
+
 ## [0.24.0] - 2026-08-19
 
 - 书签的 `cover` / `tags` / `favorite` 三个字段从数据模型删除：三者始终无处填写、无处显示，保留只是噪音

@@ -7,6 +7,14 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.24.0] - 2026-08-19
+
+- 书签的 `cover` / `tags` / `favorite` 三个字段从数据模型删除：三者始终无处填写、无处显示，保留只是噪音
+  - 删除点：CLI `model.rs::Bookmark` + `Bookmark::new`、`query.rs::keyword_filter` 的 tags 参与项（测试改名 `keyword_matches_note_and_folder`）、App `Bookmark.swift`（字段 / CodingKeys / 解码 / `matchesSearch`）、web `public/index.html::searchableText`、Raycast `search-bookmarks.tsx`（interface / hay / Star 图标 / TagList / keywords）
+  - `CURRENT_VERSION` 保持 3：删的是可选字段，所有读取方均 `decodeIfPresent` / serde `default` 兜底，非结构性变更；bump 会让旧 App 的 `supportedVersion = 3` 校验直接拒读
+  - 旧值靠 lazy 清理：下次原子写整份重写即剥离（`.bak` 兜底）；R2 镜像在下一次 `push` 前仍带旧字段
+  - 保留 `*_jst`：派生的人类可读镜像，`output.rs` 人类输出打印 `created_jst`，非冗余
+
 ## [0.23.1] - 2026-08-19
 
 - `--source` 现在放在子命令前后都生效（`jj-bookmark folders --source default` 此前报 `unexpected argument`）；每个子命令的 `--help` 也会列出它

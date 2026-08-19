@@ -10,9 +10,6 @@ nonisolated struct Bookmark: Identifiable, Sendable, Hashable {
     var excerpt: String
     var note: String
     var folder: String
-    var cover: String
-    var tags: [String]
-    var favorite: Bool
     var created: Int64
     var createdJst: String
     var updated: Int64
@@ -23,7 +20,7 @@ nonisolated struct Bookmark: Identifiable, Sendable, Hashable {
 
 extension Bookmark: Decodable {
     enum CodingKeys: String, CodingKey {
-        case id, source, title, url, excerpt, note, folder, cover, tags, favorite
+        case id, source, title, url, excerpt, note, folder
         case created
         case createdJst = "created_jst"
         case updated
@@ -42,9 +39,6 @@ extension Bookmark: Decodable {
         excerpt = try c.decodeIfPresent(String.self, forKey: .excerpt) ?? ""
         note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
         folder = try c.decodeIfPresent(String.self, forKey: .folder) ?? ""
-        cover = try c.decodeIfPresent(String.self, forKey: .cover) ?? ""
-        tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
-        favorite = try c.decodeIfPresent(Bool.self, forKey: .favorite) ?? false
         created = try c.decodeIfPresent(Int64.self, forKey: .created) ?? 0
         createdJst = try c.decodeIfPresent(String.self, forKey: .createdJst) ?? ""
         updated = try c.decodeIfPresent(Int64.self, forKey: .updated) ?? 0
@@ -91,7 +85,7 @@ extension Bookmark {
     func matchesSearch(_ query: String) -> Bool {
         let terms = query.split(whereSeparator: { $0.isWhitespace }).map { $0.lowercased() }
         if terms.isEmpty { return true }
-        let searchable = [source, title, url, excerpt, note, folder, tags.joined(separator: " ")]
+        let searchable = [source, title, url, excerpt, note, folder]
             .joined(separator: " ")
             .lowercased()
         return terms.allSatisfy { searchable.contains($0) }

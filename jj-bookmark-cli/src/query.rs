@@ -53,13 +53,8 @@ pub fn keyword_filter(bms: Vec<Bookmark>, keyword: &str) -> Vec<Bookmark> {
     bms.into_iter()
         .filter(|b| {
             let searchable = format!(
-                "{} {} {} {} {} {}",
-                b.title,
-                b.url,
-                b.excerpt,
-                b.note,
-                b.folder,
-                b.tags.join(" ")
+                "{} {} {} {} {}",
+                b.title, b.url, b.excerpt, b.note, b.folder
             )
             .to_lowercase();
             terms.iter().all(|term| searchable.contains(term))
@@ -130,13 +125,12 @@ mod tests {
     }
 
     #[test]
-    fn keyword_matches_note_folder_and_tags() {
+    fn keyword_matches_note_and_folder() {
         let mut matching = bm(1, 0, 0, "Reference");
         matching.note = "Rust ownership".into();
         matching.folder = "Work::Backend".into();
-        matching.tags = vec!["language".into()];
 
-        let out = keyword_filter(vec![matching], "rust backend language");
+        let out = keyword_filter(vec![matching], "rust backend");
 
         assert_eq!(out.len(), 1);
     }

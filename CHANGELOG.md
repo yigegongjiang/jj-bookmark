@@ -11,6 +11,13 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.24.0] - 2026-08-19
+
+### Removed
+
+- 书签的 `cover` / `tags` / `favorite` 三个字段从数据模型删除：三者始终无处填写、无处显示（`cover` 是早期导入残留的缩略图 URL，从不渲染），保留只是让每条记录多三行噪音
+- 下一次写入书签时，数据文件里这三个字段会被自动清掉（旧值不再保留；改动前的文件仍留在 `bookmarks.json.bak`）
+
 ## [0.23.1] - 2026-08-19
 
 ### Fixed

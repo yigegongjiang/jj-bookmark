@@ -4,7 +4,7 @@ Raycast 前端：在 Raycast 里 query + open jj-bookmark 书签。仅本机 dev
 
 ## 能力
 
-- **query**：`Search Bookmarks` command，load-once 全量后内存过滤（复刻 CLI `keyword_filter`：Unicode 空白分词含全角、每词命中任意字段 title/url/excerpt/note/folder/tags）
+- **query**：`Search Bookmarks` command，load-once 全量后内存过滤（复刻 CLI `keyword_filter`：Unicode 空白分词含全角、每词命中任意字段 title/url/excerpt/note/folder）
 - **open**：回车走 `jj-bookmark --source <该书签的 source> open <id>`（默认浏览器打开 + 写 `last_visited`）；⌘⇧C 复制 URL、⌘⇧T 复制标题、⌘R 重载
 
 ## 集成面（单一核心）

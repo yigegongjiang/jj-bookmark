@@ -29,8 +29,6 @@ interface Bookmark {
   excerpt: string;
   note: string;
   folder: string;
-  tags: string[];
-  favorite: boolean;
   updated: number;
   last_visited: number;
   last_visited_jst: string;
@@ -50,7 +48,7 @@ function keywordFilter(items: Bookmark[], keyword: string): Bookmark[] {
     .map((t) => t.toLowerCase());
   if (terms.length === 0) return items;
   return items.filter((b) => {
-    const hay = `${b.title} ${b.url} ${b.excerpt} ${b.note} ${b.folder} ${b.tags.join(" ")}`.toLowerCase();
+    const hay = `${b.title} ${b.url} ${b.excerpt} ${b.note} ${b.folder}`.toLowerCase();
     return terms.every((t) => hay.includes(t));
   });
 }
@@ -113,7 +111,7 @@ export default function Command() {
       filtering={false}
       isShowingDetail={showDetail}
       onSearchTextChange={setSearchText}
-      searchBarPlaceholder="Search bookmarks (title / url / folder / note / tags)…"
+      searchBarPlaceholder="Search bookmarks (title / url / folder / note)…"
       searchBarAccessory={
         <List.Dropdown tooltip="Source" storeValue onChange={setSource}>
           <List.Dropdown.Item title="All Sources" value={ALL_SOURCES} />
@@ -130,17 +128,16 @@ export default function Command() {
           const accessories: List.Item.Accessory[] = [];
           if (b.folder) accessories.push({ icon: Icon.Folder, tag: b.folder, tooltip: `Folder: ${b.folder}` });
           if (source === ALL_SOURCES && b.source !== "default") accessories.push({ tag: b.source });
-          if (b.favorite) accessories.push({ icon: Icon.Star, tooltip: "Favorite" });
           if (b.last_visited > 0)
             accessories.push({ date: new Date(b.last_visited), tooltip: `Last visited ${b.last_visited_jst}` });
           return (
             <List.Item
               key={b.id}
-              icon={b.favorite ? Icon.Star : Icon.Bookmark}
+              icon={Icon.Bookmark}
               title={b.title || b.url}
               subtitle={showDetail ? undefined : b.title ? b.url : undefined}
               accessories={showDetail ? undefined : accessories}
-              keywords={[b.url, b.folder, ...b.tags]}
+              keywords={[b.url, b.folder]}
               detail={
                 <List.Item.Detail
                   markdown={detailMarkdown(b)}
@@ -151,16 +148,6 @@ export default function Command() {
                         <List.Item.Detail.Metadata.Label title="Folder" text={b.folder} icon={Icon.Folder} />
                       ) : null}
                       <List.Item.Detail.Metadata.Label title="Source" text={b.source} />
-                      {b.tags.length > 0 ? (
-                        <List.Item.Detail.Metadata.TagList title="Tags">
-                          {b.tags.map((t) => (
-                            <List.Item.Detail.Metadata.TagList.Item key={t} text={t} />
-                          ))}
-                        </List.Item.Detail.Metadata.TagList>
-                      ) : null}
-                      {b.favorite ? (
-                        <List.Item.Detail.Metadata.Label title="Favorite" text="Yes" icon={Icon.Star} />
-                      ) : null}
                       {b.last_visited > 0 ? (
                         <List.Item.Detail.Metadata.Label title="Last Visited" text={b.last_visited_jst} />
                       ) : null}

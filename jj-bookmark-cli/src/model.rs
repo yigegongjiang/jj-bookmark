@@ -141,12 +141,6 @@ pub struct Bookmark {
     #[serde(default)]
     pub folder: String,
     #[serde(default)]
-    pub cover: String,
-    #[serde(default)]
-    pub tags: Vec<String>,
-    #[serde(default)]
-    pub favorite: bool,
-    #[serde(default)]
     pub created: i64,
     #[serde(default)]
     pub created_jst: String,
@@ -170,9 +164,6 @@ impl Bookmark {
             excerpt: String::new(),
             note,
             folder,
-            cover: String::new(),
-            tags: Vec::new(),
-            favorite: false,
             created: now,
             created_jst: String::new(),
             updated: now,

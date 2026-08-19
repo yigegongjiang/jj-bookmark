@@ -11,6 +11,18 @@
 
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [SemVer](https://semver.org/).
 
+## [0.22.0] - 2026-08-19
+
+### Changed
+
+- 作用域参数定型为单个 `--source <NAME|all>`，省略即 `default` —— 与 `apply <URL>` 的落点是同一个默认值，读 / 写 / 改名不用分别记；要跨全部 source 时写 `--source all`（v0.21.0 的「省略 = 全部 source」已回退）
+- `all` 成为保留值，不能再作真实 source 名；`--source all apply <URL>` 报错（新增书签必须落在单一 source）
+- 保存书签的内建指引改为「`folders` 挑目录 → `apply` 存入」同为默认 source，不再混入其他 source 的旧目录体系
+
+### Fixed
+
+- `--source` 指向不存在的 source 时报错并列出已知 source（此前静默返回空结果，typo 看起来像「库里没有」）
+
 ## [0.21.0] - 2026-08-19
 
 ### Changed

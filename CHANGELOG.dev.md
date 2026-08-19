@@ -7,6 +7,18 @@
 
 # Changelog (developer, follow [CHANGELOG.md](./CHANGELOG.md))
 
+## [0.22.0] - 2026-08-19
+
+- 作用域参数定型为单个 `--source <NAME|all>`，省略即 `default` —— 与 `apply <URL>` 的落点是同一个默认值，读 / 写 / 改名不用分别记；要跨全部 source 时写 `--source all`（v0.21.0 的「省略 = 全部 source」已回退）
+  - `ScopeArgs::resolve`：`None → Scope::Source(DEFAULT_SOURCE)`、`Some("all") → Scope::All`、其余 → `Scope::Source`
+  - 调用侧改回显式跨 source：App `CLIRunner` 的 `loadAll` / `edit` / `remove` / `open` 与 Raycast `ls` / `open` 均传 `--source all`（`add` / `moveFolder` 仍传具体 source）
+- `all` 成为保留值，不能再作真实 source 名；`--source all apply <URL>` 报错（新增书签必须落在单一 source）
+  - `parse_new_source` 只用于 `--set-source`（拒 `all`）；`cmd_add` 对 `Scope::All` bail，`--source <NEW> apply <URL>` 仍是创建 source 的正当入口
+- 保存书签的内建指引改为「`folders` 挑目录 → `apply` 存入」同为默认 source，不再混入其他 source 的旧目录体系
+  - `before_help` 第 1 步查重用 `--source all ls <DOMAIN>`，第 2 步 `folders` 走默认 `default`（实机 default 29 条 vs 全部并集 93 条，safari 独有 64 条 `Brave::*` 旧体系；`ensure_leaf_placement` 只校验目标 source，异源路径会静默累积）
+- `--source` 指向不存在的 source 时报错并列出已知 source（此前静默返回空结果，typo 看起来像「库里没有」）
+  - `ensure_known_source` 在 `cmd_list` / `cmd_folders` 入口校验，`Scope::All` 跳过；写路径不校验
+
 ## [0.21.0] - 2026-08-19
 
 - 作用域选项合二为一：`--all` 移除，不带 `--source` 即作用于全部 source（列表 / 搜索 / 按 ID 编辑·删除·打开都不再需要额外参数）；只想操作单个 source 时仍用 `--source <NAME>`

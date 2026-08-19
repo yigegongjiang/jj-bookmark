@@ -5,11 +5,11 @@ Raycast 前端：在 Raycast 里 query + open jj-bookmark 书签。仅本机 dev
 ## 能力
 
 - **query**：`Search Bookmarks` command，load-once 全量后内存过滤（复刻 CLI `keyword_filter`：Unicode 空白分词含全角、每词命中任意字段 title/url/excerpt/note/folder/tags）
-- **open**：回车走 `jj-bookmark open <id>`（默认浏览器打开 + 写 `last_visited`）；⌘⇧C 复制 URL、⌘⇧T 复制标题、⌘R 重载
+- **open**：回车走 `jj-bookmark --source all open <id>`（默认浏览器打开 + 写 `last_visited`）；⌘⇧C 复制 URL、⌘⇧T 复制标题、⌘R 重载
 
 ## 集成面（单一核心）
 
-- 读：`jj-bookmark ls --json --sort updated` → `{version, sources:{name:[...]}}`（[../README.md](../README.md) 架构）
+- 读：`jj-bookmark --source all ls --json --sort updated` → `{version, sources:{name:[...]}}`（[../README.md](../README.md) 架构）
 - 写：仅 `open` 经 CLI（data-side 写操作），过滤/排序为扩展内存逻辑（仿 App/Web 前端）
 - 二进制解析：`~/.local/bin/jj-bookmark` → `/Applications/jj-bookmark.app/Contents/Helpers/jj-bookmark` → PATH 兜底
 
